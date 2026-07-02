@@ -7,6 +7,7 @@ from tkinter import filedialog
 from datetime import datetime, date
 from src.models.entities import Motor
 from src.repositories.motor_repo import MotorRepository
+from src.repositories.cliente_repo import ClienteRepository
 
 class MotorFormModal:
     def __init__(self, page: ft.Page, on_success):
@@ -18,7 +19,15 @@ class MotorFormModal:
         self.txt_tipo = ft.TextField(label='Equipamento/Tipo', hint_text='Ex: Bomba, Betoneira', border_color=ft.Colors.GREY_700, expand=True)
         self.txt_marca = ft.TextField(label='Marca', hint_text='Ex: WEG, Dancor', border_color=ft.Colors.GREY_700, expand=True)
         self.txt_modelo = ft.TextField(label='Modelo', border_color=ft.Colors.GREY_700, expand=True)
-        self.txt_cv = ft.TextField(label='Potência (CV)', hint_text='Ex: 1/2, 1.5, 2', border_color=ft.Colors.GREY_700, input_filter=ft.InputFilter(allow=True, regex_string=r"[0-9\/\.]", replacement_string=""), expand=True)
+        
+        # Filtro de CV corrigido: aceita apenas números, ponto e barra sem travar a digitação
+        self.txt_cv = ft.TextField(
+            label='Potência (CV)', hint_text='Ex: 1/2, 1.5, 2', 
+            border_color=ft.Colors.GREY_700, 
+            input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9\/\.]*$", replacement_string=""), 
+            expand=True
+        )
+        
         self.txt_rpm = ft.TextField(label='Rotação (RPM)', hint_text='Ex: 3500, 1750', border_color=ft.Colors.GREY_700, max_length=4, input_filter=ft.NumbersOnlyInputFilter(), expand=True)
         
         self.dropdown_tensao = ft.Dropdown(
@@ -27,7 +36,6 @@ class MotorFormModal:
             options=[ft.dropdown.Option('110'), ft.dropdown.Option('220'), ft.dropdown.Option('110/220'), ft.dropdown.Option('380'), ft.dropdown.Option('440')]
         )
         
-        self.txt_serie = ft.TextField(label='Nº de série (Opcional)', border_color=ft.Colors.GREY_700)
         self.txt_problema = ft.TextField(label='Problema relatado', multiline=True, min_lines=2, border_color=ft.Colors.GREY_700)
         
         hoje_br = date.today().strftime("%d/%m/%Y")
@@ -40,21 +48,20 @@ class MotorFormModal:
         self.texto_foto = ft.Text("Nenhuma foto selecionada", size=12, color=ft.Colors.GREY_400)
         self.img_preview = ft.Image(src="", width=120, height=120, fit="contain", visible=False, border_radius=8)
         
-        self.dropdown_cliente = ft.Dropdown(hint_text='Selecione o cliente', options=[ft.dropdown.Option('Cliente Padrão Balcão')], border_color=ft.Colors.BLUE_700, value='Cliente Padrão Balcão')
+        self.dropdown_cliente = ft.Dropdown(label='Selecione o Cliente *', border_color=ft.Colors.BLUE_700, options=[])
         self.btn_salvar_modal = ft.ElevatedButton('Salvar no Banco', bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_motor)
         
         self.modal = ft.AlertDialog(
             title=ft.Text('Novo motor / Equipamento', weight=ft.FontWeight.BOLD),
             content=ft.Container(
-                width=600, height=620,
+                width=600, height=580, # Altura levemente reduzida já que tiramos um campo
                 content=ft.ListView([
-                    ft.Text('Cliente *', size=12, color=ft.Colors.BLUE_400),
                     self.dropdown_cliente,
                     ft.Row([self.txt_tipo, self.txt_marca], spacing=10),
                     ft.Row([self.txt_modelo, self.txt_cv], spacing=10),
                     ft.Row([self.txt_rpm, self.dropdown_tensao], spacing=10),
                     ft.Row([self.txt_data_entrada, self.btn_calendario], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                    self.txt_serie, self.txt_problema,
+                    self.txt_problema,
                     ft.Divider(color=ft.Colors.GREY_800),
                     ft.Row([
                         ft.Column([self.btn_foto, self.texto_foto], spacing=5, expand=True),
@@ -65,8 +72,14 @@ class MotorFormModal:
             actions=[ft.TextButton('Cancelar', on_click=self.fechar_modal)],
             actions_alignment=ft.MainAxisAlignment.END
         )
-        # Adiciona o botão de salvar depois, para não criar conflito nas ações
         self.modal.actions.append(self.btn_salvar_modal)
+
+    def carregar_clientes_no_dropdown(self):
+        clientes = ClienteRepository.get_all_active()
+        opcoes = [ft.dropdown.Option("Cliente Padrão Balcão")]
+        for c in clientes:
+            opcoes.append(ft.dropdown.Option(c.nome))
+        self.dropdown_cliente.options = opcoes
 
     def abrir_calendario(self, e):
         if self.date_picker not in self.page.overlay:
@@ -107,9 +120,11 @@ class MotorFormModal:
         self.page.update()
 
     def limpar_campos(self):
-        for txt in [self.txt_tipo, self.txt_marca, self.txt_modelo, self.txt_cv, self.txt_rpm, self.txt_serie, self.txt_problema]:
+        # Referência ao txt_serie removida daqui
+        for txt in [self.txt_tipo, self.txt_marca, self.txt_modelo, self.txt_cv, self.txt_rpm, self.txt_problema]:
             txt.value = ''
         self.dropdown_tensao.value = None
+        self.dropdown_cliente.value = "Cliente Padrão Balcão"
         self.caminho_foto_atual = None
         self.texto_foto.value = "Nenhuma foto selecionada"
         self.texto_foto.color = ft.Colors.GREY_400
@@ -126,6 +141,8 @@ class MotorFormModal:
         self.txt_tipo.disabled = False
         self.txt_marca.disabled = False
         self.limpar_campos()
+        self.carregar_clientes_no_dropdown()
+        
         if self.modal not in self.page.overlay:
             self.page.overlay.append(self.modal)
         self.modal.open = True
@@ -139,18 +156,21 @@ class MotorFormModal:
         self.dropdown_cliente.disabled = True
         self.txt_tipo.disabled = True
         self.txt_marca.disabled = True
+        self.carregar_clientes_no_dropdown()
         
         self.txt_tipo.value = motor.tipo
         self.txt_marca.value = motor.marca
         self.txt_modelo.value = motor.modelo
-        self.txt_cv.value = re.sub(r"[^0-9\/\.]", "", str(motor.cv or ''))
+        self.txt_cv.value = str(motor.cv or '')
         self.txt_rpm.value = re.sub(r"[^0-9]", "", str(motor.rpm or ''))
         
         tensao_suja = str(motor.tensao or '')
         opcoes_tensao = [opt.key for opt in self.dropdown_tensao.options]
         self.dropdown_tensao.value = tensao_suja if tensao_suja in opcoes_tensao else None
         
-        self.txt_serie.value = motor.numero_serie
+        if hasattr(motor, 'cliente'):
+            self.dropdown_cliente.value = motor.cliente if motor.cliente in [o.key for o in self.dropdown_cliente.options] else "Cliente Padrão Balcão"
+        
         self.txt_problema.value = motor.problema_relatado
         
         if motor.data_entrada:
@@ -179,8 +199,8 @@ class MotorFormModal:
         self.page.update()
 
     def salvar_motor(self, e):
-        if not self.txt_tipo.value or not self.txt_marca.value:
-            self.page.snack_bar = ft.SnackBar(ft.Text('Por favor, preencha Tipo e Marca!'), bgcolor=ft.Colors.ORANGE_800)
+        if not self.txt_tipo.value or not self.txt_marca.value or not self.dropdown_cliente.value:
+            self.page.snack_bar = ft.SnackBar(ft.Text('Por favor, preencha Cliente, Tipo e Marca!'), bgcolor=ft.Colors.ORANGE_800)
             self.page.snack_bar.open = True
             self.page.update()
             return
@@ -194,6 +214,8 @@ class MotorFormModal:
             self.page.update()
             return
 
+        cliente_selecionado = self.dropdown_cliente.value
+
         if self.motor_em_edicao:
             self.motor_em_edicao.tipo = self.txt_tipo.value
             self.motor_em_edicao.marca = self.txt_marca.value
@@ -201,26 +223,33 @@ class MotorFormModal:
             self.motor_em_edicao.cv = self.txt_cv.value
             self.motor_em_edicao.rpm = self.txt_rpm.value
             self.motor_em_edicao.tensao = tensao_final
-            self.motor_em_edicao.numero_serie = self.txt_serie.value
             self.motor_em_edicao.problema_relatado = self.txt_problema.value
             self.motor_em_edicao.data_entrada = data_objeto
+            if hasattr(self.motor_em_edicao, 'cliente'):
+                self.motor_em_edicao.cliente = cliente_selecionado
             if self.caminho_foto_atual:
                 self.motor_em_edicao.caminho_foto = self.caminho_foto_atual
             
             MotorRepository.update(self.motor_em_edicao)
             msg_sucesso, cor_snack = 'Alterações salvas com sucesso!', ft.Colors.ORANGE_800
         else:
-            novo = Motor(
-                tipo=self.txt_tipo.value, marca=self.txt_marca.value, modelo=self.txt_modelo.value, 
-                cv=self.txt_cv.value, rpm=self.txt_rpm.value, tensao=tensao_final, 
-                numero_serie=self.txt_serie.value, problema_relatado=self.txt_problema.value,
-                caminho_foto=self.caminho_foto_atual, data_entrada=data_objeto
-            )
+            # Correção principal: O cliente agora é passado DIRETAMENTE na criação, evitando que o SQLModel de erro de state
+            kwargs = {
+                "tipo": self.txt_tipo.value, "marca": self.txt_marca.value, "modelo": self.txt_modelo.value, 
+                "cv": self.txt_cv.value, "rpm": self.txt_rpm.value, "tensao": tensao_final, 
+                "problema_relatado": self.txt_problema.value,
+                "caminho_foto": self.caminho_foto_atual, "data_entrada": data_objeto
+            }
+            # Adiciona ao dicionário apenas se o nome selecionado não for nulo
+            if cliente_selecionado:
+                kwargs["cliente"] = cliente_selecionado
+                
+            novo = Motor(**kwargs)
             MotorRepository.create(novo)
-            msg_sucesso, cor_snack = 'Motor registado com sucesso!', ft.Colors.GREEN_700
+            msg_sucesso, cor_snack = 'Motor registrado com sucesso!', ft.Colors.GREEN_700
         
         self.fechar_modal()
         self.page.snack_bar = ft.SnackBar(ft.Text(msg_sucesso), bgcolor=cor_snack)
         self.page.snack_bar.open = True
         if self.on_success:
-            self.on_success() # Atualiza a lista na view principal
+            self.on_success()
