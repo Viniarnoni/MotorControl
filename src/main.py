@@ -4,6 +4,7 @@ from src.ui.views.dashboard_view import DashboardView
 from src.ui.views.motor_view import MotorView
 from src.ui.views.cliente_view import ClienteView
 from src.ui.views.tabela_preco_view import TabelaPrecoView
+from src.ui.views.orcamento_view import OrcamentoView
 
 def main(page: ft.Page):
     init_db()
@@ -26,18 +27,7 @@ def main(page: ft.Page):
         elif e.control.selected_index == 3:
             conteudo_central.content = TabelaPrecoView(page)
         elif e.control.selected_index == 4:
-            # Centralização garantida usando Row e Column com strings alignment/horizontal_alignment
-            conteudo_central.content = ft.Column(
-                [
-                    ft.Row(
-                        [ft.Text("Tela de Orçamentos em Construção 🚧", size=24, color=ft.Colors.GREY_500)],
-                        alignment="center"
-                    )
-                ],
-                alignment="center",
-                horizontal_alignment="center",
-                expand=True
-            )
+            conteudo_central.content = OrcamentoView(page)
             
         page.update()
 
