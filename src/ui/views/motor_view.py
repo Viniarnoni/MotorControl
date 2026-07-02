@@ -4,6 +4,7 @@ import os
 import shutil
 import tkinter as tk
 from tkinter import filedialog
+from datetime import datetime, date
 from src.models.entities import Motor
 from src.repositories.motor_repo import MotorRepository
 
@@ -36,6 +37,19 @@ class MotorView:
         self.txt_serie = ft.TextField(label='Nº de série (Opcional)', border_color=ft.Colors.GREY_700)
         self.txt_problema = ft.TextField(label='Problema relatado', multiline=True, min_lines=2, border_color=ft.Colors.GREY_700)
         
+        # Campo de Data de Entrada e Seletor de Data
+        hoje_br = date.today().strftime("%d/%m/%Y")
+        self.txt_data_entrada = ft.TextField(label='Data de Entrada', value=hoje_br, border_color=ft.Colors.GREY_700, expand=True)
+        
+        # DatePicker sem o argumento locale para evitar o congelamento da tela cinza
+        self.date_picker = ft.DatePicker(
+            on_change=self.mudar_data,
+            first_date=datetime(2020, 1, 1),
+            last_date=datetime(2030, 12, 31)
+        )
+        self.btn_calendario = ft.IconButton(icon=ft.Icons.CALENDAR_MONTH, icon_color=ft.Colors.BLUE_400, on_click=self.abrir_calendario)
+        
+        # Fotos e Listagem
         self.btn_foto = ft.ElevatedButton("Anexar Foto", icon=ft.Icons.CAMERA_ALT, bgcolor=ft.Colors.GREY_800, color=ft.Colors.WHITE, on_click=self.escolher_foto_nativo)
         self.texto_foto = ft.Text("Nenhuma foto selecionada", size=12, color=ft.Colors.GREY_400)
         self.img_preview = ft.Image(src="", width=120, height=120, fit="contain", visible=False, border_radius=8)
@@ -56,6 +70,7 @@ class MotorView:
                     ft.Row([self.txt_tipo, self.txt_marca], spacing=10),
                     ft.Row([self.txt_modelo, self.txt_cv], spacing=10),
                     ft.Row([self.txt_rpm, self.dropdown_tensao], spacing=10),
+                    ft.Row([self.txt_data_entrada, self.btn_calendario], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                     self.txt_serie, self.txt_problema,
                     ft.Divider(color=ft.Colors.GREY_800),
                     ft.Row([
@@ -79,7 +94,6 @@ class MotorView:
             ]
         )
         
-        # AJUSTADO: Removido o alignment=ft.alignment.center
         self.img_foto_ampliada = ft.Image(src="", fit="contain", height=400)
         self.modal_ver_foto = ft.AlertDialog(
             title=ft.Text('Visualizar Foto do Equipamento'),
@@ -88,6 +102,21 @@ class MotorView:
             actions_alignment=ft.MainAxisAlignment.END
         )
         
+    def abrir_calendario(self, e):
+        if self.date_picker not in self.page.overlay:
+            self.page.overlay.append(self.date_picker)
+        self.date_picker.open = True
+        self.page.update()
+
+    def mudar_data(self, e):
+        if self.date_picker.value:
+            if isinstance(self.date_picker.value, str):
+                dt = datetime.fromisoformat(self.date_picker.value.replace("Z", ""))
+                self.txt_data_entrada.value = dt.strftime("%d/%m/%Y")
+            else:
+                self.txt_data_entrada.value = self.date_picker.value.strftime("%d/%m/%Y")
+            self.page.update()
+
     def escolher_foto_nativo(self, e):
         root = tk.Tk()
         root.withdraw()
@@ -127,8 +156,10 @@ class MotorView:
         self.txt_marca.disabled = False
         
         self.limpar_campos()
+        
         if self.modal_novo_motor not in self.page.overlay:
             self.page.overlay.append(self.modal_novo_motor)
+            
         self.modal_novo_motor.open = True
         self.page.update()
         
@@ -148,6 +179,10 @@ class MotorView:
         self.modal_ver_foto.open = False
         self.page.update()
 
+    def fechar_modal_exclusao(self, e):
+        self.modal_confirmar_exclusao.open = False
+        self.page.update()
+
     def limpar_campos(self):
         for txt in [self.txt_tipo, self.txt_marca, self.txt_modelo, self.txt_cv, self.txt_rpm, self.txt_serie, self.txt_problema]:
             txt.value = ''
@@ -157,6 +192,7 @@ class MotorView:
         self.texto_foto.color = ft.Colors.GREY_400
         self.img_preview.visible = False
         self.img_preview.src = ""
+        self.txt_data_entrada.value = date.today().strftime("%d/%m/%Y")
 
     def abrir_editar_motor(self, motor_selecionado):
         self.motor_em_edicao = motor_selecionado
@@ -185,6 +221,13 @@ class MotorView:
         self.txt_serie.value = motor_selecionado.numero_serie
         self.txt_problema.value = motor_selecionado.problema_relatado
         
+        if motor_selecionado.data_entrada:
+            if isinstance(motor_selecionado.data_entrada, str):
+                dt = datetime.strptime(motor_selecionado.data_entrada.split(" ")[0], "%Y-%m-%d")
+                self.txt_data_entrada.value = dt.strftime("%d/%m/%Y")
+            else:
+                self.txt_data_entrada.value = motor_selecionado.data_entrada.strftime("%d/%m/%Y")
+        
         self.caminho_foto_atual = motor_selecionado.caminho_foto
         if self.caminho_foto_atual and os.path.exists(self.caminho_foto_atual):
             nome = os.path.basename(self.caminho_foto_atual)
@@ -196,7 +239,7 @@ class MotorView:
             self.texto_foto.value = "Nenhuma foto selecionada"
             self.texto_foto.color = ft.Colors.GREY_400
             self.img_preview.visible = False
-        
+            
         if self.modal_novo_motor not in self.page.overlay:
             self.page.overlay.append(self.modal_novo_motor)
         self.modal_novo_motor.open = True
@@ -209,29 +252,31 @@ class MotorView:
         self.modal_confirmar_exclusao.open = True
         self.page.update()
 
-    def fechar_modal_exclusao(self, e):
-        self.modal_confirmar_exclusao.open = False
-        self.page.update()
-
     def confirmar_exclusao(self, e):
         if self.motor_para_excluir:
             MotorRepository.desativar(self.motor_para_excluir.id)
             self.fechar_modal_exclusao(e)
             self.atualizar_lista_tela()
-            snack = ft.SnackBar(ft.Text('Equipamento movido para o Histórico!'), bgcolor=ft.Colors.RED_700)
-            self.page.overlay.append(snack)
-            snack.open = True
+            self.page.snack_bar = ft.SnackBar(ft.Text('Equipamento movido para o Histórico!'), bgcolor=ft.Colors.RED_700)
+            self.page.snack_bar.open = True
             self.page.update()
 
     def salvar_motor(self, e):
         if not self.txt_tipo.value or not self.txt_marca.value:
-            snack = ft.SnackBar(ft.Text('Por favor, preencha Tipo e Marca!'), bgcolor=ft.Colors.ORANGE_800)
-            self.page.overlay.append(snack)
-            snack.open = True
+            self.page.snack_bar = ft.SnackBar(ft.Text('Por favor, preencha Tipo e Marca!'), bgcolor=ft.Colors.ORANGE_800)
+            self.page.snack_bar.open = True
             self.page.update()
             return
             
         tensao_final = str(self.dropdown_tensao.value or '')
+        
+        try:
+            data_objeto = datetime.strptime(self.txt_data_entrada.value, "%d/%m/%Y").date()
+        except ValueError:
+            self.page.snack_bar = ft.SnackBar(ft.Text('Formato de data inválido! Use DD/MM/AAAA'), bgcolor=ft.Colors.RED_700)
+            self.page.snack_bar.open = True
+            self.page.update()
+            return
 
         if self.motor_em_edicao:
             self.motor_em_edicao.tipo = self.txt_tipo.value
@@ -242,6 +287,7 @@ class MotorView:
             self.motor_em_edicao.tensao = tensao_final
             self.motor_em_edicao.numero_serie = self.txt_serie.value
             self.motor_em_edicao.problema_relatado = self.txt_problema.value
+            self.motor_em_edicao.data_entrada = data_objeto
             if self.caminho_foto_atual:
                 self.motor_em_edicao.caminho_foto = self.caminho_foto_atual
             
@@ -257,7 +303,8 @@ class MotorView:
                 tensao=tensao_final, 
                 numero_serie=self.txt_serie.value, 
                 problema_relatado=self.txt_problema.value,
-                caminho_foto=self.caminho_foto_atual
+                caminho_foto=self.caminho_foto_atual,
+                data_entrada=data_objeto
             )
             MotorRepository.create(novo)
             msg_sucesso, cor_snack = 'Motor registado e salvo com sucesso!', ft.Colors.GREEN_700
@@ -265,9 +312,8 @@ class MotorView:
         self.limpar_campos()
         self.fechar_modal(e)
         self.atualizar_lista_tela()
-        snack_sucesso = ft.SnackBar(ft.Text(msg_sucesso), bgcolor=cor_snack)
-        self.page.overlay.append(snack_sucesso)
-        snack_sucesso.open = True
+        self.page.snack_bar = ft.SnackBar(ft.Text(msg_sucesso), bgcolor=cor_snack)
+        self.page.snack_bar.open = True
         self.page.update()
         
     def atualizar_lista_tela(self):
@@ -276,6 +322,16 @@ class MotorView:
         if lista:
             for item in lista:
                 prob = item.problema_relatado if item.problema_relatado else 'Não informado'
+                
+                dt_exibicao = ""
+                if item.data_entrada:
+                    if isinstance(item.data_entrada, str):
+                        try:
+                            dt_exibicao = datetime.strptime(item.data_entrada.split(" ")[0], "%Y-%m-%d").strftime("%d/%m/%Y")
+                        except:
+                            dt_exibicao = item.data_entrada
+                    else:
+                        dt_exibicao = item.data_entrada.strftime("%d/%m/%Y")
                 
                 icone_foto = ft.IconButton(
                     icon=ft.Icons.IMAGE, 
@@ -297,6 +353,7 @@ class MotorView:
                                         icone_foto
                                     ], spacing=5, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                                     ft.Text(f'Dados Técnicos: {item.cv} CV | {item.rpm} RPM | {item.tensao}V', color=ft.Colors.GREY_400, size=13),
+                                    ft.Text(f'Data de Entrada: {dt_exibicao}', color=ft.Colors.BLUE_300, size=13),
                                     ft.Text(f'Problema: {prob}', color=ft.Colors.RED_300, size=12)
                                 ], expand=True),
                                 ft.Row([
