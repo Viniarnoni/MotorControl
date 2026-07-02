@@ -20,7 +20,6 @@ class MotorFormModal:
         self.txt_marca = ft.TextField(label='Marca', hint_text='Ex: WEG, Dancor', border_color=ft.Colors.GREY_700, expand=True)
         self.txt_modelo = ft.TextField(label='Modelo', border_color=ft.Colors.GREY_700, expand=True)
         
-        # Filtro de CV corrigido: aceita apenas números, ponto e barra sem travar a digitação
         self.txt_cv = ft.TextField(
             label='Potência (CV)', hint_text='Ex: 1/2, 1.5, 2', 
             border_color=ft.Colors.GREY_700, 
@@ -35,6 +34,22 @@ class MotorFormModal:
             border_color=ft.Colors.GREY_700, expand=True,
             options=[ft.dropdown.Option('110'), ft.dropdown.Option('220'), ft.dropdown.Option('110/220'), ft.dropdown.Option('380'), ft.dropdown.Option('440')]
         )
+        
+        # --- NOVOS CAMPOS PARA A MATRIZ DE PREÇO ---
+        self.dropdown_fases = ft.Dropdown(
+            label='Fases / Rede *',
+            border_color=ft.Colors.GREY_700, expand=True,
+            value="Monofásico/Bifásico",
+            options=[ft.dropdown.Option('Monofásico/Bifásico'), ft.dropdown.Option('Trifásico')]
+        )
+        
+        self.dropdown_polos = ft.Dropdown(
+            label='Polos *',
+            border_color=ft.Colors.GREY_700, expand=True,
+            value="2 Polos",
+            options=[ft.dropdown.Option('2 Polos'), ft.dropdown.Option('4 Polos'), ft.dropdown.Option('6 Polos'), ft.dropdown.Option('8 Polos')]
+        )
+        # ------------------------------------------
         
         self.txt_problema = ft.TextField(label='Problema relatado', multiline=True, min_lines=2, border_color=ft.Colors.GREY_700)
         
@@ -54,12 +69,13 @@ class MotorFormModal:
         self.modal = ft.AlertDialog(
             title=ft.Text('Novo motor / Equipamento', weight=ft.FontWeight.BOLD),
             content=ft.Container(
-                width=600, height=580, # Altura levemente reduzida já que tiramos um campo
+                width=600, height=640,
                 content=ft.ListView([
                     self.dropdown_cliente,
                     ft.Row([self.txt_tipo, self.txt_marca], spacing=10),
                     ft.Row([self.txt_modelo, self.txt_cv], spacing=10),
                     ft.Row([self.txt_rpm, self.dropdown_tensao], spacing=10),
+                    ft.Row([self.dropdown_fases, self.dropdown_polos], spacing=10), # Nova linha adicionada
                     ft.Row([self.txt_data_entrada, self.btn_calendario], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                     self.txt_problema,
                     ft.Divider(color=ft.Colors.GREY_800),
@@ -120,10 +136,11 @@ class MotorFormModal:
         self.page.update()
 
     def limpar_campos(self):
-        # Referência ao txt_serie removida daqui
         for txt in [self.txt_tipo, self.txt_marca, self.txt_modelo, self.txt_cv, self.txt_rpm, self.txt_problema]:
             txt.value = ''
         self.dropdown_tensao.value = None
+        self.dropdown_fases.value = "Monofásico/Bifásico"
+        self.dropdown_polos.value = "2 Polos"
         self.dropdown_cliente.value = "Cliente Padrão Balcão"
         self.caminho_foto_atual = None
         self.texto_foto.value = "Nenhuma foto selecionada"
@@ -167,6 +184,10 @@ class MotorFormModal:
         tensao_suja = str(motor.tensao or '')
         opcoes_tensao = [opt.key for opt in self.dropdown_tensao.options]
         self.dropdown_tensao.value = tensao_suja if tensao_suja in opcoes_tensao else None
+        
+        # Restaura os novos campos técnicos na edição
+        self.dropdown_fases.value = motor.fases if motor.fases else "Monofásico/Bifásico"
+        self.dropdown_polos.value = motor.polos if motor.polos else "2 Polos"
         
         if hasattr(motor, 'cliente'):
             self.dropdown_cliente.value = motor.cliente if motor.cliente in [o.key for o in self.dropdown_cliente.options] else "Cliente Padrão Balcão"
@@ -223,6 +244,8 @@ class MotorFormModal:
             self.motor_em_edicao.cv = self.txt_cv.value
             self.motor_em_edicao.rpm = self.txt_rpm.value
             self.motor_em_edicao.tensao = tensao_final
+            self.motor_em_edicao.fases = self.dropdown_fases.value
+            self.motor_em_edicao.polos = self.dropdown_polos.value
             self.motor_em_edicao.problema_relatado = self.txt_problema.value
             self.motor_em_edicao.data_entrada = data_objeto
             if hasattr(self.motor_em_edicao, 'cliente'):
@@ -233,14 +256,13 @@ class MotorFormModal:
             MotorRepository.update(self.motor_em_edicao)
             msg_sucesso, cor_snack = 'Alterações salvas com sucesso!', ft.Colors.ORANGE_800
         else:
-            # Correção principal: O cliente agora é passado DIRETAMENTE na criação, evitando que o SQLModel de erro de state
             kwargs = {
                 "tipo": self.txt_tipo.value, "marca": self.txt_marca.value, "modelo": self.txt_modelo.value, 
                 "cv": self.txt_cv.value, "rpm": self.txt_rpm.value, "tensao": tensao_final, 
+                "fases": self.dropdown_fases.value, "polos": self.dropdown_polos.value,
                 "problema_relatado": self.txt_problema.value,
                 "caminho_foto": self.caminho_foto_atual, "data_entrada": data_objeto
             }
-            # Adiciona ao dicionário apenas se o nome selecionado não for nulo
             if cliente_selecionado:
                 kwargs["cliente"] = cliente_selecionado
                 

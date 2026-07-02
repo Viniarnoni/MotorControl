@@ -1,39 +1,62 @@
-﻿from typing import Optional, List
-from datetime import date
-from sqlmodel import Field, SQLModel, Relationship
-from datetime import datetime
+﻿from sqlmodel import SQLModel, Field
 from typing import Optional
-
-class Motor(SQLModel, table=True):
-    __tablename__ = "motores"
-    
-    id: Optional[int] = Field(default=None, primary_key=True)
-    cliente_id: Optional[int] = Field(foreign_key="clientes.id", default=None)
-    
-    tipo: str
-    marca: str
-    modelo: str
-    cv: str
-    rpm: str
-    tensao: str
-    numero_serie: Optional[str] = Field(default=None, index=True)
-    data_entrada: date = Field(default_factory=date.today)
-    status: str = Field(default="Recebido")
-    responsavel: Optional[str] = Field(default=None)
-    problema_relatado: Optional[str] = Field(default=None)
-    diagnostico: Optional[str] = Field(default=None)
-    observacoes: Optional[str] = Field(default=None)
-    is_active: bool = Field(default=True)
-    caminho_foto: Optional[str] = Field(default=None)   
-    cliente: Optional["Cliente"] = Relationship(back_populates="motores")
+from datetime import date
 
 class Cliente(SQLModel, table=True):
-    __tablename__ = "clientes"
-    
     id: Optional[int] = Field(default=None, primary_key=True)
-    nome: str = Field(index=True)
-    telefone: str
-    cidade: str
-    observacoes: Optional[str] = Field(default=None)
-    is_active: bool = Field(default=True) 
-    motores: List[Motor] = Relationship(back_populates="cliente")
+    nome: str
+    telefone: Optional[str] = None
+    ativo: bool = Field(default=True)
+
+class Motor(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    cliente: str
+    tipo: str
+    marca: str
+    modelo: Optional[str] = None
+    cv: Optional[str] = None
+    rpm: Optional[str] = None
+    tensao: Optional[str] = None
+    
+    # Campos da Matriz de Orçamento
+    fases: Optional[str] = Field(default="Monofásico/Bifásico")
+    polos: Optional[str] = Field(default="2 Polos")
+    
+    problema_relatado: Optional[str] = None
+    caminho_foto: Optional[str] = None
+    data_entrada: date = Field(default_factory=date.today)
+    
+    # --- CAMPO RESTAURADO AQUI ---
+    is_active: bool = Field(default=True)
+
+class PrecoServico(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    cv: str                      
+    fases: str                   
+    polos: str                   
+    preco_rebobinagem: float     
+
+class PrecoPeca(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    nome: str                    
+    preco_unitario: float
+
+class Orcamento(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    motor_id: int
+    motor_descricao: str         
+    cliente_nome: str            
+    data_emissao: date = Field(default_factory=date.today)
+    valor_mao_de_obra: float = 0.0
+    valor_pecas: float = 0.0
+    valor_total: float = 0.0
+    observacoes: Optional[str] = None
+    status: str = Field(default="Pendente") 
+
+class ItemOrcamento(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    orcamento_id: int
+    descricao: str               
+    quantidade: int = 1
+    preco_unitario: float
+    preco_total: float

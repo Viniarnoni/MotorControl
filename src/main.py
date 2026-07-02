@@ -1,20 +1,21 @@
 ﻿import flet as ft
+from src.core.database import init_db
 from src.ui.views.dashboard_view import DashboardView
 from src.ui.views.motor_view import MotorView
 from src.ui.views.cliente_view import ClienteView
+from src.ui.views.tabela_preco_view import TabelaPrecoView
 
 def main(page: ft.Page):
-    # Configurações globais da janela
+    init_db()
+
     page.title = 'OficinaMotor — Gestão de Oficina'
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 0
 
-    # Container que vai segurar o conteúdo da tela selecionada
     conteudo_central = ft.Container(expand=True)
 
-    # Função que escuta o clique no menu e troca as telas
     def mudar_tela(e):
-        conteudo_central.content = None # Limpa a tela atual
+        conteudo_central.content = None 
         
         if e.control.selected_index == 0:
             conteudo_central.content = DashboardView(page).build()
@@ -22,12 +23,26 @@ def main(page: ft.Page):
             conteudo_central.content = MotorView(page).build()
         elif e.control.selected_index == 2:
             conteudo_central.content = ClienteView(page).build()
+        elif e.control.selected_index == 3:
+            conteudo_central.content = TabelaPrecoView(page)
+        elif e.control.selected_index == 4:
+            # Centralização garantida usando Row e Column com strings alignment/horizontal_alignment
+            conteudo_central.content = ft.Column(
+                [
+                    ft.Row(
+                        [ft.Text("Tela de Orçamentos em Construção 🚧", size=24, color=ft.Colors.GREY_500)],
+                        alignment="center"
+                    )
+                ],
+                alignment="center",
+                horizontal_alignment="center",
+                expand=True
+            )
             
         page.update()
 
-    # Menu lateral (Sidebar)
     sidebar = ft.NavigationRail(
-        selected_index=1, # Começa selecionado em 'Motores'
+        selected_index=1, 
         label_type=ft.NavigationRailLabelType.ALL,
         min_width=100,
         leading=ft.Icon(ft.Icons.BUILD_ROUNDED, color=ft.Colors.BLUE_400, size=32),
@@ -36,14 +51,14 @@ def main(page: ft.Page):
             ft.NavigationRailDestination(icon=ft.Icons.DASHBOARD_ROUNDED, label='Dashboard'),
             ft.NavigationRailDestination(icon=ft.Icons.ENGINEERING_ROUNDED, label='Motores'),
             ft.NavigationRailDestination(icon=ft.Icons.PEOPLE_ROUNDED, label='Clientes'),
+            ft.NavigationRailDestination(icon=ft.Icons.ATTACH_MONEY_ROUNDED, label='Preços'),
+            ft.NavigationRailDestination(icon=ft.Icons.REQUEST_QUOTE_ROUNDED, label='Orçamentos'),
         ],
-        on_change=mudar_tela # Aciona a função quando clica
+        on_change=mudar_tela
     )
     
-    # Injeta a tela inicial na primeira vez que abre o app (Motores)
     conteudo_central.content = MotorView(page).build()
 
-    # Adiciona a estrutura inteira na janela
     page.add(
         ft.Row(
             [sidebar, ft.VerticalDivider(width=1, color=ft.Colors.GREY_800), conteudo_central],
