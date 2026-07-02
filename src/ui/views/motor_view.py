@@ -1,91 +1,27 @@
 ﻿import flet as ft
-import re
 import os
-import shutil
-import tkinter as tk
-from tkinter import filedialog
-from datetime import datetime, date
-from src.models.entities import Motor
 from src.repositories.motor_repo import MotorRepository
+from src.ui.components.motor_card import criar_card_motor
+from src.ui.components.motor_form import MotorFormModal
 
 class MotorView:
     def __init__(self, page: ft.Page):
         self.page = page
-        self.motor_em_edicao = None
-        self.caminho_foto_atual = None
         
-        # Campos do Formulário
-        self.txt_tipo = ft.TextField(label='Equipamento/Tipo', hint_text='Ex: Bomba, Betoneira', border_color=ft.Colors.GREY_700, expand=True)
-        self.txt_marca = ft.TextField(label='Marca', hint_text='Ex: WEG, Dancor', border_color=ft.Colors.GREY_700, expand=True)
-        self.txt_modelo = ft.TextField(label='Modelo', border_color=ft.Colors.GREY_700, expand=True)
-        self.txt_cv = ft.TextField(label='Potência (CV)', hint_text='Ex: 1/2, 1.5, 2', border_color=ft.Colors.GREY_700, input_filter=ft.InputFilter(allow=True, regex_string=r"[0-9\/\.]", replacement_string=""), expand=True)
-        self.txt_rpm = ft.TextField(label='Rotação (RPM)', hint_text='Ex: 3500, 1750', border_color=ft.Colors.GREY_700, max_length=4, input_filter=ft.NumbersOnlyInputFilter(), expand=True)
+        # O formulário agora mora no arquivo dele e a gente só chama ele aqui
+        self.form_modal = MotorFormModal(page, on_success=self.atualizar_lista_tela)
         
-        self.dropdown_tensao = ft.Dropdown(
-            label='Tensão/Voltagem',
-            border_color=ft.Colors.GREY_700,
-            expand=True,
-            options=[
-                ft.dropdown.Option('110'),
-                ft.dropdown.Option('220'),
-                ft.dropdown.Option('110/220'),
-                ft.dropdown.Option('380'),
-                ft.dropdown.Option('440'),
-            ]
+        self.txt_busca = ft.TextField(
+            hint_text="Buscar por equipamento, marca, modelo ou nº de série...",
+            prefix_icon=ft.Icons.SEARCH, border_color=ft.Colors.BLUE_700, expand=True,
+            on_change=lambda e: self.atualizar_lista_tela()
         )
         
-        self.txt_serie = ft.TextField(label='Nº de série (Opcional)', border_color=ft.Colors.GREY_700)
-        self.txt_problema = ft.TextField(label='Problema relatado', multiline=True, min_lines=2, border_color=ft.Colors.GREY_700)
+        self.lista_vazia = ft.Text('Nenhum motor encontrado...', color=ft.Colors.GREY_400)
+        self.coluna_listagem = ft.Column([self.lista_vazia], spacing=10)
         
-        # Campo de Data de Entrada e Seletor de Data
-        hoje_br = date.today().strftime("%d/%m/%Y")
-        self.txt_data_entrada = ft.TextField(label='Data de Entrada', value=hoje_br, border_color=ft.Colors.GREY_700, expand=True)
-        
-        # DatePicker sem o argumento locale para evitar o congelamento da tela cinza
-        self.date_picker = ft.DatePicker(
-            on_change=self.mudar_data,
-            first_date=datetime(2020, 1, 1),
-            last_date=datetime(2030, 12, 31)
-        )
-        self.btn_calendario = ft.IconButton(icon=ft.Icons.CALENDAR_MONTH, icon_color=ft.Colors.BLUE_400, on_click=self.abrir_calendario)
-        
-        # Fotos e Listagem
-        self.btn_foto = ft.ElevatedButton("Anexar Foto", icon=ft.Icons.CAMERA_ALT, bgcolor=ft.Colors.GREY_800, color=ft.Colors.WHITE, on_click=self.escolher_foto_nativo)
-        self.texto_foto = ft.Text("Nenhuma foto selecionada", size=12, color=ft.Colors.GREY_400)
-        self.img_preview = ft.Image(src="", width=120, height=120, fit="contain", visible=False, border_radius=8)
-        
-        self.lista_motores_vazia = ft.Text('Nenhum motor registado ainda...', color=ft.Colors.GREY_400)
-        self.coluna_listagem = ft.Column([self.lista_motores_vazia], spacing=10)
-        self.dropdown_cliente = ft.Dropdown(hint_text='Selecione o cliente', options=[ft.dropdown.Option('Cliente Padrão Balcão')], border_color=ft.Colors.BLUE_700, value='Cliente Padrão Balcão')
-        self.btn_salvar_modal = ft.ElevatedButton('Salvar no Banco', bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_motor)
-        
-        # Modal de Cadastro/Edição
-        self.modal_novo_motor = ft.AlertDialog(
-            title=ft.Text('Novo motor / Equipamento', weight=ft.FontWeight.BOLD),
-            content=ft.Container(
-                width=600, height=620,
-                content=ft.ListView([
-                    ft.Text('Cliente *', size=12, color=ft.Colors.BLUE_400),
-                    self.dropdown_cliente,
-                    ft.Row([self.txt_tipo, self.txt_marca], spacing=10),
-                    ft.Row([self.txt_modelo, self.txt_cv], spacing=10),
-                    ft.Row([self.txt_rpm, self.dropdown_tensao], spacing=10),
-                    ft.Row([self.txt_data_entrada, self.btn_calendario], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                    self.txt_serie, self.txt_problema,
-                    ft.Divider(color=ft.Colors.GREY_800),
-                    ft.Row([
-                        ft.Column([self.btn_foto, self.texto_foto], spacing=5, expand=True),
-                        self.img_preview
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER)
-                ], spacing=15)
-            ),
-            actions=[ft.TextButton('Cancelar', on_click=self.fechar_modal), self.btn_salvar_modal],
-            actions_alignment=ft.MainAxisAlignment.END
-        )
-        
-        # Modal de Exclusão
         self.motor_para_excluir = None
-        self.modal_confirmar_exclusao = ft.AlertDialog(
+        self.modal_exclusao = ft.AlertDialog(
             title=ft.Text('Confirmar Exclusão'),
             content=ft.Text('Tem a certeza de que deseja remover este equipamento?'),
             actions=[
@@ -96,277 +32,78 @@ class MotorView:
         
         self.img_foto_ampliada = ft.Image(src="", fit="contain", height=400)
         self.modal_ver_foto = ft.AlertDialog(
-            title=ft.Text('Visualizar Foto do Equipamento'),
+            title=ft.Text('Visualizar Foto'),
             content=ft.Container(content=self.img_foto_ampliada, width=500, height=400),
-            actions=[ft.TextButton('Fechar', on_click=self.fechar_modal_foto)],
+            actions=[ft.TextButton('Fechar', on_click=lambda e: self.fechar_modal_foto())],
             actions_alignment=ft.MainAxisAlignment.END
         )
-        
-    def abrir_calendario(self, e):
-        if self.date_picker not in self.page.overlay:
-            self.page.overlay.append(self.date_picker)
-        self.date_picker.open = True
+
+    def abrir_novo_motor(self, e):
+        self.form_modal.abrir_para_novo()
+
+    def editar_motor(self, motor):
+        self.form_modal.abrir_para_editar(motor)
+
+    def abrir_excluir_motor(self, motor):
+        self.motor_para_excluir = motor
+        if self.modal_exclusao not in self.page.overlay:
+            self.page.overlay.append(self.modal_exclusao)
+        self.modal_exclusao.open = True
         self.page.update()
 
-    def mudar_data(self, e):
-        if self.date_picker.value:
-            if isinstance(self.date_picker.value, str):
-                dt = datetime.fromisoformat(self.date_picker.value.replace("Z", ""))
-                self.txt_data_entrada.value = dt.strftime("%d/%m/%Y")
-            else:
-                self.txt_data_entrada.value = self.date_picker.value.strftime("%d/%m/%Y")
-            self.page.update()
-
-    def escolher_foto_nativo(self, e):
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        
-        caminho_selecionado = filedialog.askopenfilename(
-            title="Selecione a foto do motor",
-            filetypes=[("Imagens", "*.png;*.jpg;*.jpeg;*.webp")]
-        )
-        root.destroy()
-        
-        if caminho_selecionado:
-            pasta_destino = os.path.join(os.getcwd(), "assets", "fotos")
-            os.makedirs(pasta_destino, exist_ok=True)
-            
-            nome_arquivo = os.path.basename(caminho_selecionado)
-            caminho_final = os.path.join(pasta_destino, nome_arquivo)
-            
-            shutil.copy(caminho_selecionado, caminho_final)
-            
-            self.caminho_foto_atual = os.path.abspath(caminho_final)
-            self.texto_foto.value = f"Foto anexada: {nome_arquivo}"
-            self.texto_foto.color = ft.Colors.GREEN_400
-            
-            self.img_preview.src = self.caminho_foto_atual
-            self.img_preview.visible = True
-            self.page.update()
-        
-    def abrir_modal(self, e):
-        self.motor_em_edicao = None
-        self.modal_novo_motor.title.value = 'Novo motor / Equipamento'
-        self.btn_salvar_modal.text = 'Salvar no Banco'
-        self.btn_salvar_modal.bgcolor = ft.Colors.BLUE_700
-        
-        self.dropdown_cliente.disabled = False
-        self.txt_tipo.disabled = False
-        self.txt_marca.disabled = False
-        
-        self.limpar_campos()
-        
-        if self.modal_novo_motor not in self.page.overlay:
-            self.page.overlay.append(self.modal_novo_motor)
-            
-        self.modal_novo_motor.open = True
-        self.page.update()
-        
-    def fechar_modal(self, e):
-        self.modal_novo_motor.open = False
-        self.page.update()
-        
-    def abrir_visualizar_foto(self, caminho_foto):
-        if caminho_foto and os.path.exists(caminho_foto):
-            self.img_foto_ampliada.src = os.path.abspath(caminho_foto)
-            if self.modal_ver_foto not in self.page.overlay:
-                self.page.overlay.append(self.modal_ver_foto)
-            self.modal_ver_foto.open = True
-            self.page.update()
-
-    def fechar_modal_foto(self, e):
-        self.modal_ver_foto.open = False
-        self.page.update()
-
-    def fechar_modal_exclusao(self, e):
-        self.modal_confirmar_exclusao.open = False
-        self.page.update()
-
-    def limpar_campos(self):
-        for txt in [self.txt_tipo, self.txt_marca, self.txt_modelo, self.txt_cv, self.txt_rpm, self.txt_serie, self.txt_problema]:
-            txt.value = ''
-        self.dropdown_tensao.value = None
-        self.caminho_foto_atual = None
-        self.texto_foto.value = "Nenhuma foto selecionada"
-        self.texto_foto.color = ft.Colors.GREY_400
-        self.img_preview.visible = False
-        self.img_preview.src = ""
-        self.txt_data_entrada.value = date.today().strftime("%d/%m/%Y")
-
-    def abrir_editar_motor(self, motor_selecionado):
-        self.motor_em_edicao = motor_selecionado
-        self.modal_novo_motor.title.value = 'Editar Motor / Equipamento'
-        self.btn_salvar_modal.text = 'Salvar Alterações'
-        self.btn_salvar_modal.bgcolor = ft.Colors.ORANGE_700
-        
-        self.dropdown_cliente.disabled = True
-        self.txt_tipo.disabled = True
-        self.txt_marca.disabled = True
-        
-        self.txt_tipo.value = motor_selecionado.tipo
-        self.txt_marca.value = motor_selecionado.marca
-        self.txt_modelo.value = motor_selecionado.modelo
-        
-        cv_sujo = str(motor_selecionado.cv or '')
-        self.txt_cv.value = re.sub(r"[^0-9\/\.]", "", cv_sujo)
-        
-        rpm_sujo = str(motor_selecionado.rpm or '')
-        self.txt_rpm.value = re.sub(r"[^0-9]", "", rpm_sujo)
-        
-        tensao_suja = str(motor_selecionado.tensao or '')
-        opcoes_tensao = [opt.key for opt in self.dropdown_tensao.options]
-        self.dropdown_tensao.value = tensao_suja if tensao_suja in opcoes_tensao else None
-        
-        self.txt_serie.value = motor_selecionado.numero_serie
-        self.txt_problema.value = motor_selecionado.problema_relatado
-        
-        if motor_selecionado.data_entrada:
-            if isinstance(motor_selecionado.data_entrada, str):
-                dt = datetime.strptime(motor_selecionado.data_entrada.split(" ")[0], "%Y-%m-%d")
-                self.txt_data_entrada.value = dt.strftime("%d/%m/%Y")
-            else:
-                self.txt_data_entrada.value = motor_selecionado.data_entrada.strftime("%d/%m/%Y")
-        
-        self.caminho_foto_atual = motor_selecionado.caminho_foto
-        if self.caminho_foto_atual and os.path.exists(self.caminho_foto_atual):
-            nome = os.path.basename(self.caminho_foto_atual)
-            self.texto_foto.value = f"Foto atual: {nome}"
-            self.texto_foto.color = ft.Colors.GREEN_400
-            self.img_preview.src = os.path.abspath(self.caminho_foto_atual)
-            self.img_preview.visible = True
-        else:
-            self.texto_foto.value = "Nenhuma foto selecionada"
-            self.texto_foto.color = ft.Colors.GREY_400
-            self.img_preview.visible = False
-            
-        if self.modal_novo_motor not in self.page.overlay:
-            self.page.overlay.append(self.modal_novo_motor)
-        self.modal_novo_motor.open = True
-        self.page.update()
-
-    def abrir_excluir_motor(self, motor_selecionado):
-        self.motor_para_excluir = motor_selecionado
-        if self.modal_confirmar_exclusao not in self.page.overlay:
-            self.page.overlay.append(self.modal_confirmar_exclusao)
-        self.modal_confirmar_exclusao.open = True
+    def fechar_modal_exclusao(self, e=None):
+        self.modal_exclusao.open = False
         self.page.update()
 
     def confirmar_exclusao(self, e):
         if self.motor_para_excluir:
             MotorRepository.desativar(self.motor_para_excluir.id)
-            self.fechar_modal_exclusao(e)
+            self.fechar_modal_exclusao()
             self.atualizar_lista_tela()
-            self.page.snack_bar = ft.SnackBar(ft.Text('Equipamento movido para o Histórico!'), bgcolor=ft.Colors.RED_700)
+            self.page.snack_bar = ft.SnackBar(ft.Text('Equipamento arquivado!'), bgcolor=ft.Colors.RED_700)
             self.page.snack_bar.open = True
             self.page.update()
 
-    def salvar_motor(self, e):
-        if not self.txt_tipo.value or not self.txt_marca.value:
-            self.page.snack_bar = ft.SnackBar(ft.Text('Por favor, preencha Tipo e Marca!'), bgcolor=ft.Colors.ORANGE_800)
-            self.page.snack_bar.open = True
+    def visualizar_foto(self, caminho):
+        if caminho and os.path.exists(caminho):
+            self.img_foto_ampliada.src = os.path.abspath(caminho)
+            if self.modal_ver_foto not in self.page.overlay:
+                self.page.overlay.append(self.modal_ver_foto)
+            self.modal_ver_foto.open = True
             self.page.update()
-            return
-            
-        tensao_final = str(self.dropdown_tensao.value or '')
-        
-        try:
-            data_objeto = datetime.strptime(self.txt_data_entrada.value, "%d/%m/%Y").date()
-        except ValueError:
-            self.page.snack_bar = ft.SnackBar(ft.Text('Formato de data inválido! Use DD/MM/AAAA'), bgcolor=ft.Colors.RED_700)
-            self.page.snack_bar.open = True
-            self.page.update()
-            return
 
-        if self.motor_em_edicao:
-            self.motor_em_edicao.tipo = self.txt_tipo.value
-            self.motor_em_edicao.marca = self.txt_marca.value
-            self.motor_em_edicao.modelo = self.txt_modelo.value
-            self.motor_em_edicao.cv = self.txt_cv.value
-            self.motor_em_edicao.rpm = self.txt_rpm.value
-            self.motor_em_edicao.tensao = tensao_final
-            self.motor_em_edicao.numero_serie = self.txt_serie.value
-            self.motor_em_edicao.problema_relatado = self.txt_problema.value
-            self.motor_em_edicao.data_entrada = data_objeto
-            if self.caminho_foto_atual:
-                self.motor_em_edicao.caminho_foto = self.caminho_foto_atual
-            
-            MotorRepository.update(self.motor_em_edicao)
-            msg_sucesso, cor_snack = 'Alterações salvas com sucesso!', ft.Colors.ORANGE_800
-        else:
-            novo = Motor(
-                tipo=self.txt_tipo.value, 
-                marca=self.txt_marca.value, 
-                modelo=self.txt_modelo.value, 
-                cv=self.txt_cv.value, 
-                rpm=self.txt_rpm.value, 
-                tensao=tensao_final, 
-                numero_serie=self.txt_serie.value, 
-                problema_relatado=self.txt_problema.value,
-                caminho_foto=self.caminho_foto_atual,
-                data_entrada=data_objeto
-            )
-            MotorRepository.create(novo)
-            msg_sucesso, cor_snack = 'Motor registado e salvo com sucesso!', ft.Colors.GREEN_700
-        
-        self.limpar_campos()
-        self.fechar_modal(e)
-        self.atualizar_lista_tela()
-        self.page.snack_bar = ft.SnackBar(ft.Text(msg_sucesso), bgcolor=cor_snack)
-        self.page.snack_bar.open = True
+    def fechar_modal_foto(self):
+        self.modal_ver_foto.open = False
         self.page.update()
-        
+
     def atualizar_lista_tela(self):
         lista = MotorRepository.get_all_active()
+        termo = self.txt_busca.value.lower() if self.txt_busca.value else ""
+        
+        if termo:
+            lista = [
+                i for i in lista if
+                termo in (i.tipo or "").lower() or
+                termo in (i.marca or "").lower() or
+                termo in (i.modelo or "").lower() or
+                termo in (i.numero_serie or "").lower()
+            ]
+            
         self.coluna_listagem.controls.clear()
         if lista:
             for item in lista:
-                prob = item.problema_relatado if item.problema_relatado else 'Não informado'
-                
-                dt_exibicao = ""
-                if item.data_entrada:
-                    if isinstance(item.data_entrada, str):
-                        try:
-                            dt_exibicao = datetime.strptime(item.data_entrada.split(" ")[0], "%Y-%m-%d").strftime("%d/%m/%Y")
-                        except:
-                            dt_exibicao = item.data_entrada
-                    else:
-                        dt_exibicao = item.data_entrada.strftime("%d/%m/%Y")
-                
-                icone_foto = ft.IconButton(
-                    icon=ft.Icons.IMAGE, 
-                    icon_color=ft.Colors.GREEN_400, 
-                    icon_size=20,
-                    tooltip="Clique para ver a foto do motor",
-                    on_click=lambda e, path=item.caminho_foto: self.abrir_visualizar_foto(path)
-                ) if item.caminho_foto else ft.Container()
-                
-                card = ft.Card(
-                    content=ft.Container(
-                        padding=15,
-                        content=ft.Column([
-                            ft.Row([
-                                ft.Column([
-                                    ft.Row([
-                                        ft.Text(f'{item.tipo} - {item.marca} {item.modelo}', size=16, weight=ft.FontWeight.BOLD),
-                                        ft.Container(ft.Text(item.status, size=11), bgcolor=ft.Colors.BLUE_900, padding=5, border_radius=5),
-                                        icone_foto
-                                    ], spacing=5, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                                    ft.Text(f'Dados Técnicos: {item.cv} CV | {item.rpm} RPM | {item.tensao}V', color=ft.Colors.GREY_400, size=13),
-                                    ft.Text(f'Data de Entrada: {dt_exibicao}', color=ft.Colors.BLUE_300, size=13),
-                                    ft.Text(f'Problema: {prob}', color=ft.Colors.RED_300, size=12)
-                                ], expand=True),
-                                ft.Row([
-                                    ft.IconButton(icon=ft.Icons.EDIT_ROUNDED, icon_color=ft.Colors.ORANGE_400, tooltip='Editar', on_click=lambda e, i=item: self.abrir_editar_motor(i)),
-                                    ft.IconButton(icon=ft.Icons.DELETE_ROUNDED, icon_color=ft.Colors.RED_400, tooltip='Remover', on_click=lambda e, i=item: self.abrir_excluir_motor(i))
-                                ], alignment=ft.MainAxisAlignment.END)
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-                        ], spacing=5)
-                    ), bgcolor=ft.Colors.GREY_900
+                # Chama a função que desenha o card importada do nosso componente
+                card = criar_card_motor(
+                    item=item, 
+                    on_edit=self.editar_motor, 
+                    on_delete=self.abrir_excluir_motor, 
+                    on_view_photo=self.visualizar_foto
                 )
                 self.coluna_listagem.controls.append(card)
         else:
-            self.coluna_listagem.controls.append(self.lista_motores_vazia)
+            self.coluna_listagem.controls.append(
+                ft.Text('Nenhum equipamento corresponde à busca.', color=ft.Colors.GREY_400, italic=True) if termo else self.lista_vazia
+            )
         self.page.update()
             
     def build(self):
@@ -377,9 +114,11 @@ class MotorView:
             content=ft.Column([
                 ft.Row([
                     ft.Text('Motores e Equipamentos', size=28, weight=ft.FontWeight.BOLD),
-                    ft.ElevatedButton('Novo motor', icon=ft.Icons.ADD, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.abrir_modal)
+                    ft.ElevatedButton('Novo motor', icon=ft.Icons.ADD, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.abrir_novo_motor)
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                ft.Divider(height=20, color=ft.Colors.GREY_800),
+                ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
+                ft.Row([self.txt_busca], alignment=ft.MainAxisAlignment.START),
+                ft.Divider(height=15, color=ft.Colors.GREY_800),
                 self.coluna_listagem
             ], scroll=ft.ScrollMode.ALWAYS)
         )
