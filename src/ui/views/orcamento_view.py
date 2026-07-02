@@ -193,7 +193,6 @@ class OrcamentoView(ft.Container):
                                         content=ft.Text(o.status.upper(), color=ft.Colors.WHITE, size=11, weight=ft.FontWeight.BOLD),
                                         bgcolor=cor_status, padding=5, border_radius=4
                                     ),
-                                    # USANDO O ÍCONE CREATE NO LUGAR DE EDIT
                                     ft.IconButton(
                                         icon=ft.Icons.CREATE, icon_color=ft.Colors.BLUE_400,
                                         tooltip="Editar Orçamento", on_click=lambda e, oid=o.id: self.carregar_orcamento_para_edicao(oid)
@@ -388,9 +387,11 @@ class OrcamentoView(ft.Container):
                         orcamento_db.valor_total = total_geral
                         orcamento_db.observacoes = self.txt_obs.value
                         session.add(orcamento_db)
+                        session.commit() # SALVA O PAI ANTES PARA EVITAR CONFLITO SEQUENCIAL
                         
                         itens_antigos = session.exec(select(ItemOrcamento).where(ItemOrcamento.orcamento_id == self.editando_orcamento_id)).all()
                         for item in itens_antigos: session.delete(item)
+                        session.commit() # LIMPA OS FILHOS ANTIGOS
                     orcamento_id_vinculo = self.editando_orcamento_id
                 else:
                     novo_orcamento = Orcamento(
@@ -409,19 +410,24 @@ class OrcamentoView(ft.Container):
                         preco_unitario=item["preco_uni"], preco_total=item["total"]
                     )
                     session.add(item_db)
-                session.commit()
+                session.commit() # INSERE OS NOVOS ITENS ATUALIZADOS
                 
             self.editando_orcamento_id = None
             self.itens_temporarios_pecas.clear()
             self.txt_valor_mo.value = "0.00"
             self.txt_obs.value = ""
+            self.drop_motores.value = None
+            self.txt_detalhes_motor.value = "Selecione um motor para exibir os detalhes."
+            self.txt_detalhes_motor.color = ft.Colors.GREY_400
             self.btn_salvar.text = "Salvar e Emitir Orçamento"
             self.btn_salvar.bgcolor = ft.Colors.GREEN_700
             self.btn_cancelar_edicao.visible = False
             
-            self.txt_detalhes_motor.value = "✅ Operação concluída com sucesso!"
-            self.txt_detalhes_motor.color = ft.Colors.GREEN_400
             self.atualizar_totais_tela()
+            
+            self.txt_detalhes_motor.value = "✅ Orçamento atualizado com sucesso!"
+            self.txt_detalhes_motor.color = ft.Colors.GREEN_400
+            self.pg.update()
             
         except Exception as ex:
             self.txt_detalhes_motor.value = f"❌ Erro na operação: {str(ex)}"
