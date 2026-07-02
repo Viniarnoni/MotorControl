@@ -13,6 +13,7 @@ class MotorView:
         self.motor_em_edicao = None
         self.caminho_foto_atual = None
         
+        # Campos do Formulário
         self.txt_tipo = ft.TextField(label='Equipamento/Tipo', hint_text='Ex: Bomba, Betoneira', border_color=ft.Colors.GREY_700, expand=True)
         self.txt_marca = ft.TextField(label='Marca', hint_text='Ex: WEG, Dancor', border_color=ft.Colors.GREY_700, expand=True)
         self.txt_modelo = ft.TextField(label='Modelo', border_color=ft.Colors.GREY_700, expand=True)
@@ -37,16 +38,18 @@ class MotorView:
         
         self.btn_foto = ft.ElevatedButton("Anexar Foto", icon=ft.Icons.CAMERA_ALT, bgcolor=ft.Colors.GREY_800, color=ft.Colors.WHITE, on_click=self.escolher_foto_nativo)
         self.texto_foto = ft.Text("Nenhuma foto selecionada", size=12, color=ft.Colors.GREY_400)
+        self.img_preview = ft.Image(src="", width=120, height=120, fit="contain", visible=False, border_radius=8)
         
         self.lista_motores_vazia = ft.Text('Nenhum motor registado ainda...', color=ft.Colors.GREY_400)
         self.coluna_listagem = ft.Column([self.lista_motores_vazia], spacing=10)
         self.dropdown_cliente = ft.Dropdown(hint_text='Selecione o cliente', options=[ft.dropdown.Option('Cliente Padrão Balcão')], border_color=ft.Colors.BLUE_700, value='Cliente Padrão Balcão')
         self.btn_salvar_modal = ft.ElevatedButton('Salvar no Banco', bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_motor)
         
+        # Modal de Cadastro/Edição
         self.modal_novo_motor = ft.AlertDialog(
             title=ft.Text('Novo motor / Equipamento', weight=ft.FontWeight.BOLD),
             content=ft.Container(
-                width=600, height=600,
+                width=600, height=620,
                 content=ft.ListView([
                     ft.Text('Cliente *', size=12, color=ft.Colors.BLUE_400),
                     self.dropdown_cliente,
@@ -55,13 +58,17 @@ class MotorView:
                     ft.Row([self.txt_rpm, self.dropdown_tensao], spacing=10),
                     self.txt_serie, self.txt_problema,
                     ft.Divider(color=ft.Colors.GREY_800),
-                    ft.Row([self.btn_foto, self.texto_foto], alignment=ft.MainAxisAlignment.START)
+                    ft.Row([
+                        ft.Column([self.btn_foto, self.texto_foto], spacing=5, expand=True),
+                        self.img_preview
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER)
                 ], spacing=15)
             ),
             actions=[ft.TextButton('Cancelar', on_click=self.fechar_modal), self.btn_salvar_modal],
             actions_alignment=ft.MainAxisAlignment.END
         )
         
+        # Modal de Exclusão
         self.motor_para_excluir = None
         self.modal_confirmar_exclusao = ft.AlertDialog(
             title=ft.Text('Confirmar Exclusão'),
@@ -70,6 +77,15 @@ class MotorView:
                 ft.TextButton('Cancelar', on_click=self.fechar_modal_exclusao),
                 ft.ElevatedButton('Excluir', bgcolor=ft.Colors.RED_700, color=ft.Colors.WHITE, on_click=self.confirmar_exclusao)
             ]
+        )
+        
+        # AJUSTADO: Removido o alignment=ft.alignment.center
+        self.img_foto_ampliada = ft.Image(src="", fit="contain", height=400)
+        self.modal_ver_foto = ft.AlertDialog(
+            title=ft.Text('Visualizar Foto do Equipamento'),
+            content=ft.Container(content=self.img_foto_ampliada, width=500, height=400),
+            actions=[ft.TextButton('Fechar', on_click=self.fechar_modal_foto)],
+            actions_alignment=ft.MainAxisAlignment.END
         )
         
     def escolher_foto_nativo(self, e):
@@ -92,9 +108,12 @@ class MotorView:
             
             shutil.copy(caminho_selecionado, caminho_final)
             
-            self.caminho_foto_atual = f"assets/fotos/{nome_arquivo}"
+            self.caminho_foto_atual = os.path.abspath(caminho_final)
             self.texto_foto.value = f"Foto anexada: {nome_arquivo}"
             self.texto_foto.color = ft.Colors.GREEN_400
+            
+            self.img_preview.src = self.caminho_foto_atual
+            self.img_preview.visible = True
             self.page.update()
         
     def abrir_modal(self, e):
@@ -117,6 +136,18 @@ class MotorView:
         self.modal_novo_motor.open = False
         self.page.update()
         
+    def abrir_visualizar_foto(self, caminho_foto):
+        if caminho_foto and os.path.exists(caminho_foto):
+            self.img_foto_ampliada.src = os.path.abspath(caminho_foto)
+            if self.modal_ver_foto not in self.page.overlay:
+                self.page.overlay.append(self.modal_ver_foto)
+            self.modal_ver_foto.open = True
+            self.page.update()
+
+    def fechar_modal_foto(self, e):
+        self.modal_ver_foto.open = False
+        self.page.update()
+
     def limpar_campos(self):
         for txt in [self.txt_tipo, self.txt_marca, self.txt_modelo, self.txt_cv, self.txt_rpm, self.txt_serie, self.txt_problema]:
             txt.value = ''
@@ -124,6 +155,8 @@ class MotorView:
         self.caminho_foto_atual = None
         self.texto_foto.value = "Nenhuma foto selecionada"
         self.texto_foto.color = ft.Colors.GREY_400
+        self.img_preview.visible = False
+        self.img_preview.src = ""
 
     def abrir_editar_motor(self, motor_selecionado):
         self.motor_em_edicao = motor_selecionado
@@ -153,13 +186,16 @@ class MotorView:
         self.txt_problema.value = motor_selecionado.problema_relatado
         
         self.caminho_foto_atual = motor_selecionado.caminho_foto
-        if self.caminho_foto_atual:
+        if self.caminho_foto_atual and os.path.exists(self.caminho_foto_atual):
             nome = os.path.basename(self.caminho_foto_atual)
             self.texto_foto.value = f"Foto atual: {nome}"
             self.texto_foto.color = ft.Colors.GREEN_400
+            self.img_preview.src = os.path.abspath(self.caminho_foto_atual)
+            self.img_preview.visible = True
         else:
             self.texto_foto.value = "Nenhuma foto selecionada"
             self.texto_foto.color = ft.Colors.GREY_400
+            self.img_preview.visible = False
         
         if self.modal_novo_motor not in self.page.overlay:
             self.page.overlay.append(self.modal_novo_motor)
@@ -241,8 +277,13 @@ class MotorView:
             for item in lista:
                 prob = item.problema_relatado if item.problema_relatado else 'Não informado'
                 
-                # CORREÇÃO AQUI: Passando o ícone de forma posicional sem o 'name='
-                icone_foto = ft.Icon(ft.Icons.IMAGE, color=ft.Colors.GREEN_400, size=18, tooltip="Possui foto") if item.caminho_foto else ft.Container()
+                icone_foto = ft.IconButton(
+                    icon=ft.Icons.IMAGE, 
+                    icon_color=ft.Colors.GREEN_400, 
+                    icon_size=20,
+                    tooltip="Clique para ver a foto do motor",
+                    on_click=lambda e, path=item.caminho_foto: self.abrir_visualizar_foto(path)
+                ) if item.caminho_foto else ft.Container()
                 
                 card = ft.Card(
                     content=ft.Container(
@@ -254,7 +295,7 @@ class MotorView:
                                         ft.Text(f'{item.tipo} - {item.marca} {item.modelo}', size=16, weight=ft.FontWeight.BOLD),
                                         ft.Container(ft.Text(item.status, size=11), bgcolor=ft.Colors.BLUE_900, padding=5, border_radius=5),
                                         icone_foto
-                                    ], spacing=10),
+                                    ], spacing=5, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                                     ft.Text(f'Dados Técnicos: {item.cv} CV | {item.rpm} RPM | {item.tensao}V', color=ft.Colors.GREY_400, size=13),
                                     ft.Text(f'Problema: {prob}', color=ft.Colors.RED_300, size=12)
                                 ], expand=True),
