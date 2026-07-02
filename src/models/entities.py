@@ -1,9 +1,10 @@
 ﻿from typing import Optional, List
 from datetime import date
 from sqlmodel import Field, SQLModel, Relationship
+from datetime import datetime
+from typing import Optional
 
 class Motor(SQLModel, table=True):
-    # Sem anotação de tipo (str) aqui!
     __tablename__ = "motores"
     
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -23,11 +24,10 @@ class Motor(SQLModel, table=True):
     diagnostico: Optional[str] = Field(default=None)
     observacoes: Optional[str] = Field(default=None)
     is_active: bool = Field(default=True)
-    
+    caminho_foto: Optional[str] = Field(default=None)   
     cliente: Optional["Cliente"] = Relationship(back_populates="motores")
 
 class Cliente(SQLModel, table=True):
-    # Sem anotação de tipo (str) aqui!
     __tablename__ = "clientes"
     
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -35,6 +35,5 @@ class Cliente(SQLModel, table=True):
     telefone: str
     cidade: str
     observacoes: Optional[str] = Field(default=None)
-    is_active: bool = Field(default=True)
-    
+    is_active: bool = Field(default=True) 
     motores: List[Motor] = Relationship(back_populates="cliente")
