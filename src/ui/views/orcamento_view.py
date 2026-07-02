@@ -193,6 +193,11 @@ class OrcamentoView(ft.Container):
                                         content=ft.Text(o.status.upper(), color=ft.Colors.WHITE, size=11, weight=ft.FontWeight.BOLD),
                                         bgcolor=cor_status, padding=5, border_radius=4
                                     ),
+                                    # NOVO BOTÃO: IMPRIMIR / GERAR PDF DO HISTÓRICO
+                                    ft.IconButton(
+                                        icon=ft.Icons.PRINT, icon_color=ft.Colors.GREEN_400,
+                                        tooltip="Gerar PDF / Imprimir", on_click=lambda e, oid=o.id: self.emitir_pdf_orcamento(oid)
+                                    ),
                                     ft.IconButton(
                                         icon=ft.Icons.CREATE, icon_color=ft.Colors.BLUE_400,
                                         tooltip="Editar Orçamento", on_click=lambda e, oid=o.id: self.carregar_orcamento_para_edicao(oid)
@@ -216,6 +221,17 @@ class OrcamentoView(ft.Container):
         except Exception as ex:
             self.lista_orcamentos_ui.controls.append(ft.Text(f"Erro: {str(ex)}", color=ft.Colors.RED_400))
         self.pg.update()
+
+    def emitir_pdf_orcamento(self, orcamento_id):
+        """Dispara a geração do PDF e abre no visualizador padrão do sistema."""
+        try:
+            from src.services.pdf_service import PDFService
+            caminho = PDFService.gerar_pdf(orcamento_id)
+            PDFService.abrir_pdf(caminho)
+        except Exception as ex:
+            # Em caso de falha, mostra o aviso na barra de buscas temporariamente
+            self.txt_busca.value = f"Erro ao gerar PDF: {str(ex)}"
+            self.txt_busca.update()
 
     def carregar_orcamento_para_edicao(self, orcamento_id):
         try:
@@ -387,11 +403,11 @@ class OrcamentoView(ft.Container):
                         orcamento_db.valor_total = total_geral
                         orcamento_db.observacoes = self.txt_obs.value
                         session.add(orcamento_db)
-                        session.commit() # SALVA O PAI ANTES PARA EVITAR CONFLITO SEQUENCIAL
+                        session.commit()
                         
                         itens_antigos = session.exec(select(ItemOrcamento).where(ItemOrcamento.orcamento_id == self.editando_orcamento_id)).all()
                         for item in itens_antigos: session.delete(item)
-                        session.commit() # LIMPA OS FILHOS ANTIGOS
+                        session.commit()
                     orcamento_id_vinculo = self.editando_orcamento_id
                 else:
                     novo_orcamento = Orcamento(
@@ -410,7 +426,7 @@ class OrcamentoView(ft.Container):
                         preco_unitario=item["preco_uni"], preco_total=item["total"]
                     )
                     session.add(item_db)
-                session.commit() # INSERE OS NOVOS ITENS ATUALIZADOS
+                session.commit()
                 
             self.editando_orcamento_id = None
             self.itens_temporarios_pecas.clear()
