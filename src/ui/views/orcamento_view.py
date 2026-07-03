@@ -62,7 +62,7 @@ class OrcamentoView(ft.Container):
             visible=False, on_click=self.cancelar_edicao_ativa
         )
 
-        self.btn_salvar = ft.Button(
+        self.btn_salvar = ft.ElevatedButton(
             "Salvar e Emitir Orçamento", icon=ft.Icons.SAVE, bgcolor=ft.Colors.GREEN_700, color=ft.Colors.WHITE, height=45, on_click=self.salvar_orcamento_completo
         )
 
@@ -74,8 +74,8 @@ class OrcamentoView(ft.Container):
         self.lista_orcamentos_ui = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO, expand=True)
 
         # --- ABAS ---
-        self.btn_aba_novo = ft.Button("Novo Orçamento", icon=ft.Icons.ADD_TASK, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.mostrar_aba_novo)
-        self.btn_aba_historico = ft.Button("Orçamentos Emitidos", icon=ft.Icons.HISTORY, bgcolor=ft.Colors.GREY_800, color=ft.Colors.WHITE, on_click=self.mostrar_aba_historico)
+        self.btn_aba_novo = ft.ElevatedButton("Novo Orçamento", icon=ft.Icons.ADD_TASK, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.mostrar_aba_novo)
+        self.btn_aba_historico = ft.ElevatedButton("Orçamentos Emitidos", icon=ft.Icons.HISTORY, bgcolor=ft.Colors.GREY_800, color=ft.Colors.WHITE, on_click=self.mostrar_aba_historico)
         
         self.botoes_abas = ft.Row([self.btn_aba_novo, self.btn_aba_historico], spacing=10)
         self.area_conteudo = ft.Container(content=self.criar_layout_formulario(), expand=True)
@@ -129,7 +129,7 @@ class OrcamentoView(ft.Container):
                 ]), padding=10, bgcolor=ft.Colors.GREY_900, border_radius=5
             ),
             ft.Divider(height=10, color=ft.Colors.GREY_800),
-            ft.Text("Incluir Peças e Componentes na Troca", size=15, weight=ft.FontWeight.BOLD),
+            ft.Text("Include Peças e Componentes na Troca", size=15, weight=ft.FontWeight.BOLD),
             ft.Row([self.drop_pecas, self.row_quantidade, self.btn_add_peca], alignment=ft.MainAxisAlignment.START, vertical_alignment="center"),
             ft.Container(content=ft.ListView([self.table_itens_pecas], expand=True), height=180),
             ft.Divider(height=10, color=ft.Colors.GREY_800),
@@ -201,7 +201,6 @@ class OrcamentoView(ft.Container):
                                             ft.PopupMenuItem(content=ft.Text("Reprovado"), icon=ft.Icons.CLOSE, on_click=lambda e, oid=o.id: self.mudar_status_orcamento(oid, "Reprovado")),
                                         ]
                                     ),
-                                    # BOTÃO DO WHATSAPP REINTEGRADO
                                     ft.IconButton(
                                         icon=ft.Icons.CHAT, icon_color=ft.Colors.GREEN_500,
                                         tooltip="Enviar via WhatsApp", on_click=lambda e, oid=o.id, nome=o.cliente_nome: self.emitir_e_enviar_whatsapp(oid, nome)
@@ -247,7 +246,6 @@ class OrcamentoView(ft.Container):
             print(f"Erro ao mudar status: {ex}")
 
     def emitir_e_enviar_whatsapp(self, orcamento_id, cliente_nome):
-        """Chama a geração de PDF e o envio pelo WhatsApp resolvendo o telefone dinamicamente."""
         try:
             from src.services.pdf_service import PDFService
             caminho = PDFService.gerar_pdf(orcamento_id)
@@ -314,17 +312,39 @@ class OrcamentoView(ft.Container):
         self.atualizar_totais_tela()
 
     def excluir_orcamento(self, orcamento_id):
-        try:
-            with get_session() as session:
-                from sqlmodel import select
-                itens = session.exec(select(ItemOrcamento).where(ItemOrcamento.orcamento_id == orcamento_id)).all()
-                for item in itens: session.delete(item)
-                orcamento = session.get(Orcamento, orcamento_id)
-                if orcamento: session.delete(orcamento)
-                session.commit()
-            self.carregar_historico_db()
-        except Exception as ex:
-            print(ex)
+        def fechar_dialogo_exclusao(e):
+            dialogo_exclusao.open = False
+            self.pg.update()
+
+        def confirmar_exclusao(e):
+            dialogo_exclusao.open = False
+            self.pg.update()
+            try:
+                with get_session() as session:
+                    from sqlmodel import select
+                    itens = session.exec(select(ItemOrcamento).where(ItemOrcamento.orcamento_id == orcamento_id)).all()
+                    for item in itens: session.delete(item)
+                    orcamento = session.get(Orcamento, orcamento_id)
+                    if orcamento: session.delete(orcamento)
+                    session.commit()
+                self.carregar_historico_db()
+            except Exception as ex:
+                print(ex)
+
+        dialogo_exclusao = ft.AlertDialog(
+            title=ft.Text("Confirmar Exclusão", weight=ft.FontWeight.BOLD, color=ft.Colors.RED_400),
+            content=ft.Text("Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita."),
+            actions=[
+                ft.TextButton("Cancelar", on_click=fechar_dialogo_exclusao),
+                ft.ElevatedButton("Sim, excluir", on_click=confirmar_exclusao, bgcolor=ft.Colors.RED_700, color=ft.Colors.WHITE),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        # INJETA NO OVERLAY PARA APARECER
+        self.pg.overlay.append(dialogo_exclusao)
+        dialogo_exclusao.open = True
+        self.pg.update()
 
     def filtrar_orcamentos(self, e):
         self.carregar_historico_db()
@@ -472,12 +492,37 @@ class OrcamentoView(ft.Container):
             self.btn_cancelar_edicao.visible = False
             
             self.atualizar_totais_tela()
-            self.txt_detalhes_motor.value = "✅ Orçamento guardado e emitido!"
+            self.txt_detalhes_motor.value = "✅ Orçamento guardado com sucesso!"
             self.txt_detalhes_motor.color = ft.Colors.GREEN_400
+            
+            nome_cliente = motor.cliente
+            orc_id = orcamento_id_vinculo
+            
+            def fechar_dialogo_sucesso(ev):
+                dialogo_sucesso.open = False
+                self.pg.update()
+
+            def abrir_whatsapp_agora(ev):
+                dialogo_sucesso.open = False
+                self.pg.update()
+                self.emitir_e_enviar_whatsapp(orc_id, nome_cliente)
+
+            dialogo_sucesso = ft.AlertDialog(
+                title=ft.Text("Orçamento Salvo! 🎉", weight=ft.FontWeight.BOLD),
+                content=ft.Text(f"O orçamento de {nome_cliente} foi guardado com sucesso. Deseja enviar o orçamento via WhatsApp agora mesmo?"),
+                actions=[
+                    ft.TextButton("Agora não", on_click=fechar_dialogo_sucesso),
+                    ft.ElevatedButton("Enviar WhatsApp", on_click=abrir_whatsapp_agora, bgcolor=ft.Colors.GREEN_600, color=ft.Colors.WHITE, icon=ft.Icons.CHAT),
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+            
+            # INJETA NO OVERLAY PARA APARECER
+            self.pg.overlay.append(dialogo_sucesso)
+            dialogo_sucesso.open = True
             self.pg.update()
             
         except Exception as ex:
             self.txt_detalhes_motor.value = f"❌ Erro na operação: {str(ex)}"
             self.txt_detalhes_motor.color = ft.Colors.RED_400
             self.pg.update()
-            
