@@ -62,7 +62,8 @@ class OrcamentoView(ft.Container):
             visible=False, on_click=self.cancelar_edicao_ativa
         )
 
-        self.btn_salvar = ft.ElevatedButton(
+        # FAXINA: Alterado para ft.Button para evitar Deprecation Warning
+        self.btn_salvar = ft.Button(
             "Salvar e Emitir Orçamento", icon=ft.Icons.SAVE, bgcolor=ft.Colors.GREEN_700, color=ft.Colors.WHITE, height=45, on_click=self.salvar_orcamento_completo
         )
 
@@ -74,8 +75,9 @@ class OrcamentoView(ft.Container):
         self.lista_orcamentos_ui = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO, expand=True)
 
         # --- ABAS ---
-        self.btn_aba_novo = ft.ElevatedButton("Novo Orçamento", icon=ft.Icons.ADD_TASK, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.mostrar_aba_novo)
-        self.btn_aba_historico = ft.ElevatedButton("Orçamentos Emitidos", icon=ft.Icons.HISTORY, bgcolor=ft.Colors.GREY_800, color=ft.Colors.WHITE, on_click=self.mostrar_aba_historico)
+        # FAXINA: Alterados para ft.Button para evitar Deprecation Warning
+        self.btn_aba_novo = ft.Button("Novo Orçamento", icon=ft.Icons.ADD_TASK, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.mostrar_aba_novo)
+        self.btn_aba_historico = ft.Button("Orçamentos Emitidos", icon=ft.Icons.HISTORY, bgcolor=ft.Colors.GREY_800, color=ft.Colors.WHITE, on_click=self.mostrar_aba_historico)
         
         self.botoes_abas = ft.Row([self.btn_aba_novo, self.btn_aba_historico], spacing=10)
         self.area_conteudo = ft.Container(content=self.criar_layout_formulario(), expand=True)
@@ -176,7 +178,9 @@ class OrcamentoView(ft.Container):
                 
                 for o in orcamentos:
                     if termo and (termo not in o.cliente_nome.lower() and termo not in o.motor_descricao.lower()): continue
-                    cor_status = ft.Colors.ORANGE_700 if o.status == "Pendente" else ft.Colors.GREEN_700
+                    
+                    # Suporte às três cores dinâmicas de status
+                    cor_status = ft.Colors.ORANGE_700 if o.status == "Pendente" else (ft.Colors.GREEN_700 if o.status == "Aprovado" else ft.Colors.RED_700)
                     
                     card = ft.Container(
                         content=ft.Column([
@@ -189,11 +193,19 @@ class OrcamentoView(ft.Container):
                                     ], spacing=2)
                                 ], spacing=10),
                                 ft.Row([
-                                    ft.Container(
-                                        content=ft.Text(o.status.upper(), color=ft.Colors.WHITE, size=11, weight=ft.FontWeight.BOLD),
-                                        bgcolor=cor_status, padding=5, border_radius=4
+                                    # Menu Dropdown interativo ajustado para a versão estável do Flet
+                                    ft.PopupMenuButton(
+                                        content=ft.Container(
+                                            content=ft.Text(o.status.upper(), color=ft.Colors.WHITE, size=11, weight=ft.FontWeight.BOLD),
+                                            bgcolor=cor_status, padding=5, border_radius=4
+                                        ),
+                                        items=[
+                                            ft.PopupMenuItem(content=ft.Text("Aprovado"), icon=ft.Icons.CHECK, on_click=lambda e, oid=o.id: self.mudar_status_orcamento(oid, "Aprovado")),
+                                            ft.PopupMenuItem(content=ft.Text("Pendente"), icon=ft.Icons.HOURGLASS_EMPTY, on_click=lambda e, oid=o.id: self.mudar_status_orcamento(oid, "Pendente")),
+                                            ft.PopupMenuItem(content=ft.Text("Reprovado"), icon=ft.Icons.CLOSE, on_click=lambda e, oid=o.id: self.mudar_status_orcamento(oid, "Reprovado")),
+                                        ]
                                     ),
-                                    # NOVO BOTÃO: IMPRIMIR / GERAR PDF DO HISTÓRICO
+                                    # Ações do card
                                     ft.IconButton(
                                         icon=ft.Icons.PRINT, icon_color=ft.Colors.GREEN_400,
                                         tooltip="Gerar PDF / Imprimir", on_click=lambda e, oid=o.id: self.emitir_pdf_orcamento(oid)
@@ -222,6 +234,21 @@ class OrcamentoView(ft.Container):
             self.lista_orcamentos_ui.controls.append(ft.Text(f"Erro: {str(ex)}", color=ft.Colors.RED_400))
         self.pg.update()
 
+    def mudar_status_orcamento(self, orcamento_id, novo_status):
+        """Atualiza o status do orçamento diretamente no banco de dados e recarrega a lista."""
+        try:
+            with get_session() as session:
+                orcamento = session.get(Orcamento, orcamento_id)
+                if orcamento:
+                    orcamento.status = novo_status
+                    session.add(orcamento)
+                    session.commit()
+            
+            # Recarrega a UI para mostrar a nova cor e status
+            self.carregar_historico_db()
+        except Exception as ex:
+            print(f"Erro ao mudar status: {ex}")
+
     def emitir_pdf_orcamento(self, orcamento_id):
         """Dispara a geração do PDF e abre no visualizador padrão do sistema."""
         try:
@@ -229,7 +256,6 @@ class OrcamentoView(ft.Container):
             caminho = PDFService.gerar_pdf(orcamento_id)
             PDFService.abrir_pdf(caminho)
         except Exception as ex:
-            # Em caso de falha, mostra o aviso na barra de buscas temporariamente
             self.txt_busca.value = f"Erro ao gerar PDF: {str(ex)}"
             self.txt_busca.update()
 
@@ -449,3 +475,4 @@ class OrcamentoView(ft.Container):
             self.txt_detalhes_motor.value = f"❌ Erro na operação: {str(ex)}"
             self.txt_detalhes_motor.color = ft.Colors.RED_400
             self.pg.update()
+            
