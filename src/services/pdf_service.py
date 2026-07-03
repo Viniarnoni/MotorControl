@@ -14,13 +14,11 @@ from src.models.entities import Orcamento, ItemOrcamento, Motor
 class PDFService:
     @staticmethod
     def gerar_pdf(orcamento_id: int) -> str:
-        # Usa pathlib para criar a pasta de forma compatível com o SO
         pasta_saida = Path("orcamentos_emitidos")
         pasta_saida.mkdir(exist_ok=True)
         
         arquivo_pdf = pasta_saida / f"Orcamento_{orcamento_id}.pdf"
         
-        # Coleta os dados diretamente do banco de dados
         with get_session() as session:
             orcamento = session.get(Orcamento, orcamento_id)
             if not orcamento:
@@ -29,7 +27,6 @@ class PDFService:
             motor = session.get(Motor, orcamento.motor_id)
             itens_pecas = session.exec(select(ItemOrcamento).where(ItemOrcamento.orcamento_id == orcamento_id)).all()
         
-        # Configuração da folha A4 com margens limpas (passando string do caminho)
         doc = SimpleDocTemplate(
             str(arquivo_pdf), pagesize=A4,
             rightMargin=35, leftMargin=35, topMargin=35, bottomMargin=35
@@ -37,138 +34,126 @@ class PDFService:
         story = []
         styles = getSampleStyleSheet()
         
-        # Estilos personalizados (Azul Industrial e Cinza)
-        estilo_titulo = ParagraphStyle(
-            'TituloDoc', parent=styles['Heading1'],
-            fontSize=22, leading=26, textColor=colors.HexColor("#1A365D"), spaceAfter=4
-        )
-        estilo_subtitulo = ParagraphStyle(
-            'SubTituloDoc', parent=styles['Heading3'],
-            fontSize=10, leading=14, textColor=colors.HexColor("#4A5568"), spaceAfter=15
-        )
-        estilo_secao = ParagraphStyle(
-            'SecaoDoc', parent=styles['Heading2'],
-            fontSize=13, leading=16, textColor=colors.HexColor("#2B6CB0"), spaceBefore=12, spaceAfter=6
-        )
-        estilo_texto = ParagraphStyle(
-            'TextoDoc', parent=styles['Normal'], fontSize=10, leading=14, textColor=colors.HexColor("#2D3748")
-        )
-        estilo_negrito = ParagraphStyle(
-            'NegritoDoc', parent=estilo_texto, fontName='Helvetica-Bold'
-        )
+        # AJUSTE FIX: Adicionado 'leading' proporcional ao 'fontSize' para evitar textos sobrepostos
+        estilo_cabecalho_titulo = ParagraphStyle('CabecalhoTitulo', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=18, leading=22, alignment=1, spaceAfter=4)
+        estilo_cabecalho_texto = ParagraphStyle('CabecalhoTexto', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, leading=14, alignment=1, spaceAfter=4)
+        estilo_cabecalho_endereco = ParagraphStyle('CabecalhoEndereco', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14, alignment=1, spaceAfter=15)
+        estilo_orcamento = ParagraphStyle('OrcamentoTitulo', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, leading=18, alignment=1, spaceAfter=15)
+        
+        estilo_texto = ParagraphStyle('TextoDoc', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14)
+        estilo_negrito = ParagraphStyle('NegritoDoc', parent=estilo_texto, fontName='Helvetica-Bold')
+        estilo_tabela_centro = ParagraphStyle('TabCentro', parent=estilo_texto, alignment=1)
+        estilo_tabela_dir = ParagraphStyle('TabDir', parent=estilo_texto, alignment=2)
         
         # --- CABEÇALHO ---
-        story.append(Paragraph("ORÇAMENTO DE MANUTENÇÃO ELÉTRICA", estilo_titulo))
-        data_atual = datetime.now().strftime("%d/%m/%Y às %H:%M")
-        story.append(Paragraph(f"Documento Ref. ID #{orcamento.id} — Emitido em: {data_atual}", estilo_subtitulo))
-        story.append(Spacer(1, 5))
+        story.append(Paragraph("ELETRORECUPERADORA", estilo_cabecalho_titulo))
+        story.append(Paragraph("FELIPE BARRERE ARNONI-MEI CNPJ: 35.032.089/0001-52   Tel:(16) 3252-6033/(16) 98131-5311", estilo_cabecalho_texto))
+        story.append(Paragraph("Rua: Ennes Reis Rodrigues, 113 - Jardim Bela Vista - CEP:  15905-004 - Taquaritinga-SP", estilo_cabecalho_endereco))
         
-        # --- BLOCO: DADOS DO CLIENTE E EQUIPAMENTO ---
-        story.append(Paragraph("DADOS DO ATENDIMENTO", estilo_secao))
-        dados_gerais = [
-            [Paragraph("<b>Cliente / Empresa:</b>", estilo_texto), Paragraph(orcamento.cliente_nome, estilo_texto)],
-            [Paragraph("<b>Equipamento Principal:</b>", estilo_texto), Paragraph(orcamento.motor_descricao, estilo_texto)]
+        story.append(Paragraph("ORÇAMENTO", estilo_orcamento))
+        
+        # --- DADOS DO CLIENTE ---
+        dados_cliente = [
+            [Paragraph(f"<b>Para:</b> {orcamento.cliente_nome}", estilo_texto), Paragraph("<b>CNPJ:</b> ________________", estilo_texto), ""],
+            [Paragraph("<b>Endereço:</b> __________________________________", estilo_texto), Paragraph("<b>nº:</b> ____", estilo_texto), Paragraph("<b>Tel:</b> ________________", estilo_texto)],
+            [Paragraph("<b>Cidade:</b> Taquaritinga", estilo_texto), Paragraph("<b>Bairro:</b> Centro", estilo_texto), Paragraph("<b>Estado:</b> São Paulo", estilo_texto)]
         ]
-        if motor:
-            detalhes_motor = f"Tipo: {motor.tipo} | Marca: {motor.marca} | Potência: {motor.cv} CV | Pólos: {motor.polos} | Fases: {motor.fases}"
-            dados_gerais.append([Paragraph("<b>Especificações:</b>", estilo_texto), Paragraph(detalhes_motor, estilo_texto)])
-            
-        tabela_dados = Table(dados_gerais, colWidths=[120, 405])
-        tabela_dados.setStyle(TableStyle([
-            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        tabela_cliente = Table(dados_cliente, colWidths=[240, 140, 145])
+        tabela_cliente.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-            ('TOPPADDING', (0,0), (-1,-1), 4),
-            ('LEFTPADDING', (0,0), (-1,-1), 0),
         ]))
-        story.append(tabela_dados)
-        story.append(Spacer(1, 10))
+        story.append(tabela_cliente)
+        story.append(Spacer(1, 15))
         
-        # --- BLOCO: RELAÇÃO DE PEÇAS APLICADAS ---
-        story.append(Paragraph("RELAÇÃO DE PEÇAS E MATERIAIS", estilo_secao))
+        # --- TABELA DE ITENS (MÃO DE OBRA E PEÇAS) ---
         dados_tabela_pecas = [
             [
-                Paragraph("<b>Descrição do Componente</b>", estilo_negrito),
-                Paragraph("<b>Qtd</b>", estilo_negrito),
-                Paragraph("<b>Vlr. Unitário</b>", estilo_negrito),
-                Paragraph("<b>Total Item</b>", estilo_negrito)
+                Paragraph("<b>Quant.:</b>", estilo_texto),
+                Paragraph("<b>DESCRIÇÃO</b>", estilo_texto),
+                Paragraph("<b>Unitário</b>", estilo_tabela_centro),
+                Paragraph("<b>TOTAL</b>", estilo_tabela_centro)
             ]
         ]
         
+        # Inserindo Serviço / Mão de Obra primeiro
+        if orcamento.valor_mao_de_obra > 0:
+            if motor:
+                linha1_desc = f"Rebobinar motor elétrico {motor.fases if motor.fases else ''} marca: {motor.marca}"
+                linha2_desc = f"mod: {motor.tipo} CV: {motor.cv} RPM/Pólos: {motor.polos}"
+                
+                dados_tabela_pecas.append([
+                    Paragraph("1", estilo_texto),
+                    Paragraph(linha1_desc, estilo_texto),
+                    Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_tabela_dir),
+                    Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_tabela_dir)
+                ])
+                dados_tabela_pecas.append([
+                    Paragraph("", estilo_texto), Paragraph(linha2_desc, estilo_texto), Paragraph("", estilo_texto), Paragraph("", estilo_texto)
+                ])
+            else:
+                dados_tabela_pecas.append([
+                    Paragraph("1", estilo_texto),
+                    Paragraph(f"Serviço de Mão de Obra / Manutenção: {orcamento.motor_descricao}", estilo_texto),
+                    Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_tabela_dir),
+                    Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_tabela_dir)
+                ])
+
+        # Inserindo Peças
         for item in itens_pecas:
             dados_tabela_pecas.append([
-                Paragraph(item.descricao, estilo_texto),
                 Paragraph(str(item.quantidade), estilo_texto),
-                Paragraph(f"R$ {item.preco_unitario:.2f}", estilo_texto),
-                Paragraph(f"R$ {item.preco_total:.2f}", estilo_texto)
+                Paragraph(item.descricao, estilo_texto),
+                Paragraph(f"R$ {item.preco_unitario:.2f}", estilo_tabela_dir),
+                Paragraph(f"R$ {item.preco_total:.2f}", estilo_tabela_dir)
             ])
             
-        if not itens_pecas:
-            dados_tabela_pecas.append([Paragraph("Nenhum material cobrado separadamente (Apenas serviços).", estilo_texto), "", "", ""])
-            
-        tabela_pecas = Table(dados_tabela_pecas, colWidths=[245, 45, 110, 125])
+        # AJUSTE FIX: Forçando linhas em branco com Paragraphs vazios para manter a altura correta da tabela pautada
+        linhas_atuais = len(dados_tabela_pecas)
+        for _ in range(max(0, 15 - linhas_atuais)):
+            dados_tabela_pecas.append([
+                Paragraph("", estilo_texto), 
+                Paragraph("", estilo_texto), 
+                Paragraph("", estilo_texto), 
+                Paragraph("", estilo_texto)
+            ])
+
+        tabela_pecas = Table(dados_tabela_pecas, colWidths=[50, 295, 90, 90])
         tabela_pecas.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#EDF2F7")),
             ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-            ('TOPPADDING', (0,0), (-1,-1), 6),
-            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#F7FAFC")]),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#E2E8F0")),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ('TOPPADDING', (0,0), (-1,-1), 5),
         ]))
         story.append(tabela_pecas)
-        story.append(Spacer(1, 15))
+        story.append(Spacer(1, 20))
         
-        # --- BLOCO: RESUMO FINANCEIRO ---
-        story.append(Paragraph("RESUMO DE VALORES", estilo_secao))
-        dados_financeiros = [
-            [Paragraph("Valor da Mão de Obra / Serviços Técnicos:", estilo_texto), Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_texto)],
-            [Paragraph("Subtotal de Peças Aplicadas:", estilo_texto), Paragraph(f"R$ {orcamento.valor_pecas:.2f}", estilo_texto)],
-            [Paragraph("<b>VALOR TOTAL DO ORÇAMENTO:</b>", estilo_negrito), Paragraph(f"<b>R$ {orcamento.valor_total:.2f}</b>", estilo_negrito)]
-        ]
-        tabela_fin = Table(dados_financeiros, colWidths=[250, 150])
-        tabela_fin.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-            ('TOPPADDING', (0,0), (-1,-1), 4),
-            ('LINEBELOW', (0,1), (1,1), 1, colors.HexColor("#1A365D")),
-            ('LEFTPADDING', (0,0), (-1,-1), 0),
-        ]))
-        story.append(tabela_fin)
-        story.append(Spacer(1, 15))
-        
-        # --- BLOCO: OBSERVAÇÕES ---
-        if orcamento.observacoes and orcamento.observacoes.strip():
-            story.append(Paragraph("TERMOS E OBSERVAÇÕES DE COBRANÇA", estilo_secao))
-            texto_obs = orcamento.observacoes.replace('\n', '<br/>')
-            story.append(Paragraph(texto_obs, estilo_texto))
-            story.append(Spacer(1, 20))
-            
-        # --- CAMPOS DE ASSINATURA ---
-        story.append(Spacer(1, 30))
-        dados_assinaturas = [
+        # --- RODAPÉ ---
+        data_str = datetime.now().strftime("%d/%m/%Y")
+        dados_rodape = [
             [
-                Paragraph("________________________________________<br/>Responsável Técnico / Oficina", estilo_texto),
-                Paragraph("________________________________________<br/>De Acordo / Assinatura do Cliente", estilo_texto)
+                Paragraph(f"<b>Data:</b> {data_str}", estilo_texto),
+                Paragraph("<b>Ass:</b> Felipe Barrere Arnoni", estilo_tabela_centro),
+                Paragraph(f"<b>TOTAL: R$: {orcamento.valor_total:.2f}</b>", estilo_tabela_dir)
             ]
         ]
-        tabela_ass = Table(dados_assinaturas, colWidths=[260, 260])
-        tabela_ass.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('TOPPADDING', (0,0), (-1,-1), 10),
+        tabela_rodape = Table(dados_rodape, colWidths=[150, 225, 150])
+        tabela_rodape.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
         ]))
-        story.append(tabela_ass)
+        story.append(tabela_rodape)
         
         # Cria o PDF real
         doc.build(story)
         
-        # Retorna o caminho absoluto convertido para string (Usa o formato correto do Windows com \)
         return str(arquivo_pdf.resolve())
 
     @staticmethod
     def abrir_pdf(caminho: str):
         """Abre o arquivo PDF gerado nativamente usando caminhos absolutos e normalizados."""
         if sys.platform == "win32":
-            # os.startfile exige o caminho exato nativo (com \)
             os.startfile(caminho)
         elif sys.platform == "darwin":
             subprocess.Popen(["open", caminho])
