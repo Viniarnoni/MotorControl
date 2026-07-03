@@ -1,6 +1,6 @@
 ﻿import flet as ft
 import re
-from src.models.cliente_entity import Cliente
+from src.models.entities import Cliente
 from src.repositories.cliente_repo import ClienteRepository
 
 class ClienteFormModal:
@@ -21,7 +21,7 @@ class ClienteFormModal:
         )
         
         self.txt_endereco = ft.TextField(label='Endereço (Opcional)', border_color=ft.Colors.GREY_700, multiline=True, min_lines=2)
-        self.btn_salvar = ft.ElevatedButton('Salvar Cliente', bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_cliente)
+        self.btn_salvar = ft.Button('Salvar Cliente', bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_cliente)
         
         self.modal = ft.AlertDialog(
             title=ft.Text('Cadastrar Novo Cliente', weight=ft.FontWeight.BOLD),

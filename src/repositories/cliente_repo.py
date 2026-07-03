@@ -1,64 +1,45 @@
-﻿import sqlite3
-import os
-from src.models.cliente_entity import Cliente
+from typing import List
+from sqlmodel import select
+from src.core.database import get_session
+from src.models.entities import Cliente
 
 class ClienteRepository:
-    DB_PATH = os.path.join(os.getcwd(), "banco.db")
+    
+    @staticmethod
+    def create(cliente: Cliente) -> Cliente:
+        """Salva um novo cliente no banco de dados oficial (motorcontrol.db)."""
+        with get_session() as session:
+            session.add(cliente)
+            session.commit()
+            session.refresh(cliente)
+            return cliente
 
-    @classmethod
-    def conectar(cls):
-        return sqlite3.connect(cls.DB_PATH)
+    @staticmethod
+    def update(cliente: Cliente):
+        """Atualiza os dados do cliente."""
+        with get_session() as session:
+            db_cliente = session.get(Cliente, cliente.id)
+            if db_cliente:
+                db_cliente.nome = cliente.nome
+                db_cliente.telefone = cliente.telefone
+                db_cliente.endereco = cliente.endereco
+                db_cliente.status = cliente.status
+                session.commit()
+                session.refresh(db_cliente)
+            return db_cliente
 
-    @classmethod
-    def inicializar_banco(cls):
-        with cls.conectar() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS clientes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    nome TEXT NOT NULL,
-                    telefone TEXT,
-                    endereco TEXT,
-                    status TEXT DEFAULT 'Ativo'
-                )
-            ''')
-            conn.commit()
+    @staticmethod
+    def desativar(cliente_id: int):
+        """Marca o cliente como inativo em vez de apagar do banco."""
+        with get_session() as session:
+            db_cliente = session.get(Cliente, cliente_id)
+            if db_cliente:
+                db_cliente.status = 'Inativo'
+                session.commit()
 
-    @classmethod
-    def create(cls, cliente: Cliente):
-        cls.inicializar_banco()
-        with cls.conectar() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO clientes (nome, telefone, endereco, status) VALUES (?, ?, ?, ?)",
-                (cliente.nome, cliente.telefone, cliente.endereco, cliente.status)
-            )
-            conn.commit()
-            cliente.id = cursor.lastrowid
-        return cliente
-
-    @classmethod
-    def update(cls, cliente: Cliente):
-        with cls.conectar() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE clientes SET nome=?, telefone=?, endereco=? WHERE id=?",
-                (cliente.nome, cliente.telefone, cliente.endereco, cliente.id)
-            )
-            conn.commit()
-
-    @classmethod
-    def desativar(cls, cliente_id):
-        with cls.conectar() as conn:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE clientes SET status='Inativo' WHERE id=?", (cliente_id,))
-            conn.commit()
-
-    @classmethod
-    def get_all_active(cls):
-        cls.inicializar_banco()
-        with cls.conectar() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, telefone, endereco, status FROM clientes WHERE status = 'Ativo' ORDER BY nome")
-            rows = cursor.fetchall()
-            return [Cliente(id=r[0], nome=r[1], telefone=r[2], endereco=r[3], status=r[4]) for r in rows]
+    @staticmethod
+    def get_all_active() -> List[Cliente]:
+        """Busca todos os clientes ativos ordenados por nome."""
+        with get_session() as session:
+            statement = select(Cliente).where(Cliente.status == 'Ativo').order_by(Cliente.nome)
+            return list(session.exec(statement).all())

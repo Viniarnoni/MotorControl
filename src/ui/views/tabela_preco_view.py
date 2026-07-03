@@ -43,7 +43,7 @@ class TabelaPrecoView(ft.Container):
             ft.Text("Cadastrar Preço de Mão de Obra / Rebobinagem", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400),
             ft.Row([
                 self.txt_serv_cv, self.drop_serv_fases, self.drop_serv_polos, self.txt_serv_preco,
-                ft.ElevatedButton("Adicionar", icon=ft.Icons.ADD, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_servico)
+                ft.Button("Adicionar", icon=ft.Icons.ADD, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_servico)
             ], spacing=10, alignment=ft.MainAxisAlignment.START),
             ft.Divider(color=ft.Colors.GREY_800),
             ft.ListView([self.table_servicos], expand=True, spacing=10)
@@ -53,7 +53,7 @@ class TabelaPrecoView(ft.Container):
             ft.Text("Cadastrar Peças e Componentes de Troca", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400),
             ft.Row([
                 self.txt_peca_nome, self.txt_peca_preco,
-                ft.ElevatedButton("Adicionar", icon=ft.Icons.ADD, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_peca)
+                ft.Button("Adicionar", icon=ft.Icons.ADD, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_peca)
             ], spacing=10, alignment=ft.MainAxisAlignment.START),
             ft.Divider(color=ft.Colors.GREY_800),
             ft.ListView([self.table_pecas], expand=True, spacing=10)
@@ -61,7 +61,7 @@ class TabelaPrecoView(ft.Container):
 
         self.conteudo_da_aba = ft.Container(content=self.aba_servicos, expand=True)
 
-        self.btn_servicos = ft.ElevatedButton("Mão de Obra", icon=ft.Icons.BUILD, bgcolor=ft.Colors.BLUE_800, color=ft.Colors.WHITE, on_click=self.clique_aba_servicos)
+        self.btn_servicos = ft.Button("Mão de Obra", icon=ft.Icons.BUILD, bgcolor=ft.Colors.BLUE_800, color=ft.Colors.WHITE, on_click=self.clique_aba_servicos)
         self.btn_pecas = ft.TextButton("Peças e Componentes", icon=ft.Icons.SETTINGS_SUGGEST, on_click=self.clique_aba_pecas)
 
         self.content = ft.Column([

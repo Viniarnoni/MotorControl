@@ -23,7 +23,7 @@ class ClienteView:
             content=ft.Text('Deseja realmente remover este cliente?'),
             actions=[
                 ft.TextButton('Cancelar', on_click=lambda e: self.fechar_modal_exclusao()),
-                ft.ElevatedButton('Excluir', bgcolor=ft.Colors.RED_700, color=ft.Colors.WHITE, on_click=self.confirmar_exclusao)
+                ft.Button('Excluir', bgcolor=ft.Colors.RED_700, color=ft.Colors.WHITE, on_click=self.confirmar_exclusao)
             ]
         )
 
@@ -83,7 +83,7 @@ class ClienteView:
             content=ft.Column([
                 ft.Row([
                     ft.Text('Gerenciamento de Clientes', size=28, weight=ft.FontWeight.BOLD),
-                    ft.ElevatedButton('Novo Cliente', icon=ft.Icons.PERSON_ADD, bgcolor=ft.Colors.GREEN_700, color=ft.Colors.WHITE, on_click=self.abrir_novo_cliente)
+                    ft.Button('Novo Cliente', icon=ft.Icons.PERSON_ADD, bgcolor=ft.Colors.GREEN_700, color=ft.Colors.WHITE, on_click=self.abrir_novo_cliente)
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
                 ft.Row([self.txt_busca], alignment=ft.MainAxisAlignment.START),

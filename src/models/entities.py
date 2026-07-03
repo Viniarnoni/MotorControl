@@ -6,7 +6,8 @@ class Cliente(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     nome: str
     telefone: Optional[str] = None
-    ativo: bool = Field(default=True)
+    endereco: Optional[str] = None
+    status: Optional[str] = "Ativo"
 
 class Motor(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

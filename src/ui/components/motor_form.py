@@ -59,12 +59,13 @@ class MotorFormModal:
         self.date_picker = ft.DatePicker(on_change=self.mudar_data, first_date=datetime(2020, 1, 1), last_date=datetime(2030, 12, 31))
         self.btn_calendario = ft.IconButton(icon=ft.Icons.CALENDAR_MONTH, icon_color=ft.Colors.BLUE_400, on_click=self.abrir_calendario)
         
-        self.btn_foto = ft.ElevatedButton("Anexar Foto", icon=ft.Icons.CAMERA_ALT, bgcolor=ft.Colors.GREY_800, color=ft.Colors.WHITE, on_click=self.escolher_foto_nativo)
+        self.btn_foto = ft.Button("Anexar Foto", icon=ft.Icons.CAMERA_ALT, bgcolor=ft.Colors.GREY_800, color=ft.Colors.WHITE, on_click=self.escolher_foto_nativo)
+        self.btn_salvar_modal = ft.Button('Salvar no Banco', bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_motor)
         self.texto_foto = ft.Text("Nenhuma foto selecionada", size=12, color=ft.Colors.GREY_400)
         self.img_preview = ft.Image(src="", width=120, height=120, fit="contain", visible=False, border_radius=8)
         
         self.dropdown_cliente = ft.Dropdown(label='Selecione o Cliente *', border_color=ft.Colors.BLUE_700, options=[])
-        self.btn_salvar_modal = ft.ElevatedButton('Salvar no Banco', bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_motor)
+        self.btn_salvar_modal = ft.Button('Salvar no Banco', bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_motor)
         
         self.modal = ft.AlertDialog(
             title=ft.Text('Novo motor / Equipamento', weight=ft.FontWeight.BOLD),

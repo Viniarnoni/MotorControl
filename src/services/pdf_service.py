@@ -77,7 +77,6 @@ class PDFService:
             ]
         ]
         
-        # Inserindo Serviço / Mão de Obra primeiro
         if orcamento.valor_mao_de_obra > 0:
             if motor:
                 linha1_desc = f"Rebobinar motor elétrico {motor.fases if motor.fases else ''} marca: {motor.marca}"
@@ -100,7 +99,6 @@ class PDFService:
                     Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_tabela_dir)
                 ])
 
-        # Inserindo Peças
         for item in itens_pecas:
             dados_tabela_pecas.append([
                 Paragraph(str(item.quantidade), estilo_texto),
@@ -109,14 +107,10 @@ class PDFService:
                 Paragraph(f"R$ {item.preco_total:.2f}", estilo_tabela_dir)
             ])
             
-        # AJUSTE FIX: Forçando linhas em branco com Paragraphs vazios para manter a altura correta da tabela pautada
         linhas_atuais = len(dados_tabela_pecas)
         for _ in range(max(0, 15 - linhas_atuais)):
             dados_tabela_pecas.append([
-                Paragraph("", estilo_texto), 
-                Paragraph("", estilo_texto), 
-                Paragraph("", estilo_texto), 
-                Paragraph("", estilo_texto)
+                Paragraph("", estilo_texto), Paragraph("", estilo_texto), Paragraph("", estilo_texto), Paragraph("", estilo_texto)
             ])
 
         tabela_pecas = Table(dados_tabela_pecas, colWidths=[50, 295, 90, 90])
@@ -145,17 +139,73 @@ class PDFService:
         ]))
         story.append(tabela_rodape)
         
-        # Cria o PDF real
         doc.build(story)
-        
         return str(arquivo_pdf.resolve())
 
     @staticmethod
     def abrir_pdf(caminho: str):
-        """Abre o arquivo PDF gerado nativamente usando caminhos absolutos e normalizados."""
         if sys.platform == "win32":
             os.startfile(caminho)
         elif sys.platform == "darwin":
             subprocess.Popen(["open", caminho])
         else:
             subprocess.Popen(["xdg-open", caminho])
+
+    @staticmethod
+    def enviar_whatsapp(caminho_pdf: str, nome_cliente: str, telefone: str = ""):
+        """Abre o chat do WhatsApp usando link universal (wa.me) resolvendo telefones vazios."""
+        import urllib.parse
+        import webbrowser
+        from src.models.entities import Cliente
+
+        print(f"\n--- INÍCIO DO DEBUG WHATSAPP ---")
+        print(f"Nome do cliente recebido do orçamento: '{nome_cliente}'")
+        print(f"Telefone recebido direto da tela: '{telefone}'")
+
+        # BUSCA AUTOMÁTICA SE VIER VAZIO
+        if not telefone or str(telefone).strip() == "":
+            print(f"Telefone vazio! Iniciando varredura no banco de dados...")
+            try:
+                with get_session() as session:
+                    todos_clientes = session.exec(select(Cliente)).all()
+                    print(f"Total de clientes cadastrados no banco: {len(todos_clientes)}")
+                    
+                    nome_alvo = nome_cliente.strip().lower() if nome_cliente else ""
+                    
+                    for c in todos_clientes:
+                        nome_db = c.nome.strip().lower() if c.nome else ""
+                        print(f" -> Comparando banco: '{nome_db}' (Tel: {c.telefone}) com alvo: '{nome_alvo}'")
+                        
+                        if nome_db == nome_alvo:
+                            telefone = c.telefone
+                            print(f" [!] MATCH ENCONTRADO! O telefone agora é: '{telefone}'")
+                            break
+            except Exception as db_ex:
+                print(f"ERRO DE BANCO DE DADOS DURANTE A BUSCA: {db_ex}")
+
+        print(f"Telefone final processado antes de gerar o link: '{telefone}'")
+
+        mensagem = f"Olá, {nome_cliente}! Segue o orçamento do serviço da Eletrorecuperadora. 🛠️⚡"
+        mensagem_codificada = urllib.parse.quote(mensagem)
+        
+        telefone_limpo = "".join(filter(str.isdigit, str(telefone))) if telefone else ""
+        
+        if telefone_limpo:
+            if not telefone_limpo.startswith("55") and len(telefone_limpo) >= 10:
+                telefone_limpo = f"55{telefone_limpo}"
+            
+            print(f"URL gerada: https://wa.me/{telefone_limpo}")
+            url_whatsapp = f"https://wa.me/{telefone_limpo}?text={mensagem_codificada}"
+        else:
+            print("Nenhum telefone encontrado. Abrindo WhatsApp Web Geral...")
+            url_whatsapp = f"https://web.whatsapp.com/send?text={mensagem_codificada}"
+            
+        print(f"--- FIM DO DEBUG WHATSAPP ---\n")
+        
+        webbrowser.open(url_whatsapp)
+        
+        if sys.platform == "win32":
+            import subprocess
+            subprocess.Popen(f'explorer /select,"{Path(caminho_pdf).resolve()}"')
+        else:
+            os.startfile(Path(caminho_pdf).parent.resolve())

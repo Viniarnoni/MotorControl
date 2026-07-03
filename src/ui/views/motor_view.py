@@ -26,7 +26,7 @@ class MotorView:
             content=ft.Text('Tem a certeza de que deseja remover este equipamento?'),
             actions=[
                 ft.TextButton('Cancelar', on_click=self.fechar_modal_exclusao),
-                ft.ElevatedButton('Excluir', bgcolor=ft.Colors.RED_700, color=ft.Colors.WHITE, on_click=self.confirmar_exclusao)
+                ft.Button('Excluir', bgcolor=ft.Colors.RED_700, color=ft.Colors.WHITE, on_click=self.confirmar_exclusao)
             ]
         )
         
@@ -57,7 +57,7 @@ class MotorView:
 
     def confirmar_exclusao(self, e):
         if self.motor_para_excluir:
-            MotorRepository.desativar(self.motor_para_excluir.id)
+            MotorRepository.desativar(self.motor_para_excluir)
             self.fechar_modal_exclusao()
             self.atualizar_lista_tela()
             self.page.snack_bar = ft.SnackBar(ft.Text('Equipamento arquivado!'), bgcolor=ft.Colors.RED_700)
@@ -114,7 +114,7 @@ class MotorView:
             content=ft.Column([
                 ft.Row([
                     ft.Text('Motores e Equipamentos', size=28, weight=ft.FontWeight.BOLD),
-                    ft.ElevatedButton('Novo motor', icon=ft.Icons.ADD, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.abrir_novo_motor)
+                    ft.Button('Novo motor', icon=ft.Icons.ADD, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.abrir_novo_motor)
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
                 ft.Row([self.txt_busca], alignment=ft.MainAxisAlignment.START),

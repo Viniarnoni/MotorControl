@@ -62,7 +62,6 @@ class OrcamentoView(ft.Container):
             visible=False, on_click=self.cancelar_edicao_ativa
         )
 
-        # FAXINA: Alterado para ft.Button para evitar Deprecation Warning
         self.btn_salvar = ft.Button(
             "Salvar e Emitir Orçamento", icon=ft.Icons.SAVE, bgcolor=ft.Colors.GREEN_700, color=ft.Colors.WHITE, height=45, on_click=self.salvar_orcamento_completo
         )
@@ -75,7 +74,6 @@ class OrcamentoView(ft.Container):
         self.lista_orcamentos_ui = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO, expand=True)
 
         # --- ABAS ---
-        # FAXINA: Alterados para ft.Button para evitar Deprecation Warning
         self.btn_aba_novo = ft.Button("Novo Orçamento", icon=ft.Icons.ADD_TASK, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.mostrar_aba_novo)
         self.btn_aba_historico = ft.Button("Orçamentos Emitidos", icon=ft.Icons.HISTORY, bgcolor=ft.Colors.GREY_800, color=ft.Colors.WHITE, on_click=self.mostrar_aba_historico)
         
@@ -179,7 +177,6 @@ class OrcamentoView(ft.Container):
                 for o in orcamentos:
                     if termo and (termo not in o.cliente_nome.lower() and termo not in o.motor_descricao.lower()): continue
                     
-                    # Suporte às três cores dinâmicas de status
                     cor_status = ft.Colors.ORANGE_700 if o.status == "Pendente" else (ft.Colors.GREEN_700 if o.status == "Aprovado" else ft.Colors.RED_700)
                     
                     card = ft.Container(
@@ -193,7 +190,6 @@ class OrcamentoView(ft.Container):
                                     ], spacing=2)
                                 ], spacing=10),
                                 ft.Row([
-                                    # Menu Dropdown interativo ajustado para a versão estável do Flet
                                     ft.PopupMenuButton(
                                         content=ft.Container(
                                             content=ft.Text(o.status.upper(), color=ft.Colors.WHITE, size=11, weight=ft.FontWeight.BOLD),
@@ -205,7 +201,11 @@ class OrcamentoView(ft.Container):
                                             ft.PopupMenuItem(content=ft.Text("Reprovado"), icon=ft.Icons.CLOSE, on_click=lambda e, oid=o.id: self.mudar_status_orcamento(oid, "Reprovado")),
                                         ]
                                     ),
-                                    # Ações do card
+                                    # BOTÃO DO WHATSAPP REINTEGRADO
+                                    ft.IconButton(
+                                        icon=ft.Icons.CHAT, icon_color=ft.Colors.GREEN_500,
+                                        tooltip="Enviar via WhatsApp", on_click=lambda e, oid=o.id, nome=o.cliente_nome: self.emitir_e_enviar_whatsapp(oid, nome)
+                                    ),
                                     ft.IconButton(
                                         icon=ft.Icons.PRINT, icon_color=ft.Colors.GREEN_400,
                                         tooltip="Gerar PDF / Imprimir", on_click=lambda e, oid=o.id: self.emitir_pdf_orcamento(oid)
@@ -235,7 +235,6 @@ class OrcamentoView(ft.Container):
         self.pg.update()
 
     def mudar_status_orcamento(self, orcamento_id, novo_status):
-        """Atualiza o status do orçamento diretamente no banco de dados e recarrega a lista."""
         try:
             with get_session() as session:
                 orcamento = session.get(Orcamento, orcamento_id)
@@ -243,14 +242,21 @@ class OrcamentoView(ft.Container):
                     orcamento.status = novo_status
                     session.add(orcamento)
                     session.commit()
-            
-            # Recarrega a UI para mostrar a nova cor e status
             self.carregar_historico_db()
         except Exception as ex:
             print(f"Erro ao mudar status: {ex}")
 
+    def emitir_e_enviar_whatsapp(self, orcamento_id, cliente_nome):
+        """Chama a geração de PDF e o envio pelo WhatsApp resolvendo o telefone dinamicamente."""
+        try:
+            from src.services.pdf_service import PDFService
+            caminho = PDFService.gerar_pdf(orcamento_id)
+            PDFService.enviar_whatsapp(caminho, cliente_nome)
+        except Exception as ex:
+            self.txt_busca.value = f"Erro ao enviar WhatsApp: {str(ex)}"
+            self.txt_busca.update()
+
     def emitir_pdf_orcamento(self, orcamento_id):
-        """Dispara a geração do PDF e abre no visualizador padrão do sistema."""
         try:
             from src.services.pdf_service import PDFService
             caminho = PDFService.gerar_pdf(orcamento_id)
@@ -466,8 +472,7 @@ class OrcamentoView(ft.Container):
             self.btn_cancelar_edicao.visible = False
             
             self.atualizar_totais_tela()
-            
-            self.txt_detalhes_motor.value = "✅ Orçamento atualizado com sucesso!"
+            self.txt_detalhes_motor.value = "✅ Orçamento guardado e emitido!"
             self.txt_detalhes_motor.color = ft.Colors.GREEN_400
             self.pg.update()
             
