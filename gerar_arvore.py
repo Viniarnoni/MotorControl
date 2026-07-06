@@ -59,14 +59,21 @@ def generate_tree(dir_path: Path, prefix: str = "") -> list:
     return tree
 
 if __name__ == "__main__":
-    # Define o caminho para a raiz do seu projeto (onde o script estiver)
+    # Define o caminho para a raiz do seu projeto
     root_path = Path(__file__).parent.resolve()
+    arquivo_saida = root_path / "estrutura_projeto.txt"
     
-    print(f"\n🌲 ESTRUTURA DO PROJETO: {root_path.name} 🌲\n")
-    print(f"📂 {root_path.name}")
+    cabecalho = f"🌲 ESTRUTURA DO PROJETO: {root_path.name} 🌲\n\n📂 {root_path.name}\n"
     
+    print(cabecalho)
     linhas_arvore = generate_tree(root_path)
-    for linha in linhas_arvore:
-        print(linha)
-        
-    print("\n" + "="*40 + "\nPronto! Copie a estrutura acima se precisar.")
+    
+    # Salva no arquivo e imprime na tela ao mesmo tempo
+    with open(arquivo_saida, "w", encoding="utf-8") as f:
+        f.write(cabecalho)
+        for linha in linhas_arvore:
+            print(linha)
+            f.write(linha + "\n")
+            
+    print("\n" + "="*50)
+    print(f"✅ Pronto! A estrutura foi salva no arquivo: {arquivo_saida.name}")
