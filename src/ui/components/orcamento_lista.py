@@ -43,7 +43,14 @@ class OrcamentoLista(ft.Column):
                 for o in orcamentos:
                     if termo and (termo not in o.cliente_nome.lower() and termo not in o.motor_descricao.lower()): continue
                     
-                    cor_status = ft.Colors.ORANGE_700 if o.status == "Pendente" else (ft.Colors.GREEN_700 if o.status == "Aprovado" else ft.Colors.RED_700)
+                    if o.status == "Pendente":
+                        cor_status = ft.Colors.ORANGE_700
+                    elif o.status == "Aprovado":
+                        cor_status = ft.Colors.GREEN_700
+                    elif o.status == "Finalizado":
+                        cor_status = ft.Colors.BLUE_700
+                    else:
+                        cor_status = ft.Colors.RED_700
                     
                     card = ft.Container(
                         content=ft.Column([
@@ -65,6 +72,7 @@ class OrcamentoLista(ft.Column):
                                             ft.PopupMenuItem(content=ft.Text("Aprovado"), icon=ft.Icons.CHECK, on_click=lambda e, oid=o.id: self.mudar_status_orcamento(oid, "Aprovado")),
                                             ft.PopupMenuItem(content=ft.Text("Pendente"), icon=ft.Icons.HOURGLASS_EMPTY, on_click=lambda e, oid=o.id: self.mudar_status_orcamento(oid, "Pendente")),
                                             ft.PopupMenuItem(content=ft.Text("Reprovado"), icon=ft.Icons.CLOSE, on_click=lambda e, oid=o.id: self.mudar_status_orcamento(oid, "Reprovado")),
+                                            ft.PopupMenuItem(content=ft.Text("Finalizado"), icon=ft.Icons.DONE_ALL, on_click=lambda e, oid=o.id: self.mudar_status_orcamento(oid, "Finalizado")),
                                         ]
                                     ),
                                     ft.IconButton(
@@ -136,7 +144,7 @@ class OrcamentoLista(ft.Column):
             content=ft.Text("Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita."),
             actions=[
                 ft.TextButton("Cancelar", on_click=fechar_dialogo_exclusao),
-                ft.ElevatedButton("Sim, excluir", on_click=confirmar_exclusao, bgcolor=ft.Colors.RED_700, color=ft.Colors.WHITE),
+                ft.Button("Sim, excluir", on_click=confirmar_exclusao, bgcolor=ft.Colors.RED_700, color=ft.Colors.WHITE),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
@@ -144,4 +152,3 @@ class OrcamentoLista(ft.Column):
         self.pg.overlay.append(dialogo_exclusao)
         dialogo_exclusao.open = True
         self.pg.update()
-        

@@ -32,12 +32,12 @@ class OrcamentoRepository:
     def contar_por_status():
         try:
             with get_session() as session:
-                # Fazemos a busca filtrando diretamente pelo texto do status
                 aprovados = len(session.exec(select(Orcamento).where(Orcamento.status == "Aprovado")).all())
                 pendentes = len(session.exec(select(Orcamento).where(Orcamento.status == "Pendente")).all())
                 reprovados = len(session.exec(select(Orcamento).where(Orcamento.status == "Reprovado")).all())
+                finalizados = len(session.exec(select(Orcamento).where(Orcamento.status == "Finalizado")).all())
                 
-                return aprovados, pendentes, reprovados
+                return aprovados, pendentes, reprovados, finalizados
         except Exception as e:
             print(f"Erro ao contar status: {e}")
-            return 0, 0, 0
+            return 0, 0, 0, 0

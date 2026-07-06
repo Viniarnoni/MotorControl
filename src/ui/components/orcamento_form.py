@@ -15,11 +15,18 @@ class OrcamentoForm(ft.Column):
         self.pecas_disponiveis = []
         self.itens_temporarios_pecas = []
 
-        # --- COMPONENTES ---
-        self.drop_motores = ft.Dropdown(label="Selecione o Motor / Equipamento", expand=True, border_color=ft.Colors.BLUE_600)
+        self.txt_busca_cliente = ft.TextField(
+            label="Digitar nome do Cliente (Busca rápida)", 
+            hint_text="Ex: Saaet, João...",
+            expand=1, 
+            border_color=ft.Colors.BLUE_400,
+            on_change=self.ao_digitar_cliente
+        )
+
+        self.drop_motores = ft.Dropdown(label="Selecione o Motor / Equipamento", expand=2, border_color=ft.Colors.BLUE_600)
         self.drop_motores.on_change = self.ao_selecionar_motor
         
-        self.txt_detalhes_motor = ft.Text("Selecione um motor para exibir os detalhes.", color=ft.Colors.GREY_400, italic=True)
+        self.txt_detalhes_motor = ft.Text("Digite o nome do cliente ou selecione um motor.", color=ft.Colors.GREY_400, italic=True)
         
         self.switch_rebobinar = ft.Switch(label="Buscar Preço Tabela", value=False, active_color=ft.Colors.BLUE_400)
         self.switch_rebobinar.on_change = self.recalcular_mao_de_obra
@@ -62,14 +69,17 @@ class OrcamentoForm(ft.Column):
             visible=False, on_click=self.cancelar_edicao_ativa
         )
 
-        self.btn_salvar = ft.ElevatedButton(
+        self.btn_salvar = ft.Button(
             "Salvar e Emitir Orçamento", icon=ft.Icons.SAVE, bgcolor=ft.Colors.GREEN_700, color=ft.Colors.WHITE, height=45, on_click=self.salvar_orcamento_completo
         )
 
         self.controls = [
             ft.Text("Montador de Orçamentos Automático", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400),
             ft.Divider(color=ft.Colors.GREY_800),
-            ft.Row([self.drop_motores], spacing=10),
+            
+            # Barra superior: Campo de digitação + Dropdown de motores filtrados
+            ft.Row([self.txt_busca_cliente, self.drop_motores], spacing=10),
+            
             ft.Container(
                 content=ft.Column([
                     self.txt_detalhes_motor,
@@ -89,6 +99,37 @@ class OrcamentoForm(ft.Column):
         ]
         
         self.carregar_dados_iniciais()
+
+    # --- LÓGICA DE FILTRAGEM DINÂMICA POR DIGITAÇÃO ---
+    def ao_digitar_cliente(self, e):
+        # Filtra os motores com base no texto que está sendo digitado
+        self.atualizar_dropdown_motores(self.txt_busca_cliente.value)
+        self.drop_motores.value = None  # Reseta a seleção antiga
+        self.txt_detalhes_motor.value = "Selecione um motor da lista filtrada."
+        self.txt_detalhes_motor.color = ft.Colors.GREY_400
+        self.recalcular_mao_de_obra(None)
+        self.pg.update()
+
+    def atualizar_dropdown_motores(self, texto_filtro=""):
+        self.drop_motores.options.clear()
+        termo = (texto_filtro or "").lower().strip()
+        
+        for m in self.motores_disponiveis:
+            # Se o usuário digitou algo, checa se o termo está dentro do nome do cliente
+            if termo and termo not in (m.cliente or "").lower():
+                continue
+            
+            # Se já houver um filtro de texto ativo, encurta o texto do drop omitindo o cliente repetido
+            if termo:
+                texto_display = f"{m.marca} ({m.cv} CV, {m.polos}) - OS: {m.id}"
+            else:
+                texto_display = f"{m.cliente} -> {m.marca} ({m.cv} CV)"
+                
+            self.drop_motores.options.append(ft.dropdown.Option(key=str(m.id), text=texto_display))
+        
+        try: self.drop_motores.update()
+        except: pass
+    # -------------------------------------------------
 
     def somar_qtd(self, e):
         try:
@@ -113,9 +154,7 @@ class OrcamentoForm(ft.Column):
             self.motores_disponiveis = session.exec(select(Motor).where(Motor.is_active == True)).all()
         self.pecas_disponiveis = PrecoPecaRepository.get_all()
 
-        self.drop_motores.options.clear()
-        for m in self.motores_disponiveis:
-            self.drop_motores.options.append(ft.dropdown.Option(key=str(m.id), text=f"{m.cliente} -> {m.marca} ({m.cv} CV, {m.polos})"))
+        self.atualizar_dropdown_motores()
         
         self.drop_pecas.options.clear()
         for p in self.pecas_disponiveis:
@@ -128,6 +167,15 @@ class OrcamentoForm(ft.Column):
         if motor:
             self.txt_detalhes_motor.value = f"Especificações: {motor.tipo} {motor.marca} | {motor.cv} CV | {motor.fases} | {motor.polos}"
             self.txt_detalhes_motor.color = ft.Colors.WHITE
+            
+            # Se escolheu o motor direto sem digitar nada antes, preenche o campo de busca com o dono dele
+            if not self.txt_busca_cliente.value:
+                self.txt_busca_cliente.value = motor.cliente
+                self.txt_busca_cliente.update()
+                self.atualizar_dropdown_motores(motor.cliente)
+                self.drop_motores.value = str(motor.id)
+                self.drop_motores.update()
+                
             self.recalcular_mao_de_obra(None)
 
     def recalcular_mao_de_obra(self, e):
@@ -141,13 +189,14 @@ class OrcamentoForm(ft.Column):
                     self.txt_valor_mo.value = f"{preco_servico.preco_rebobinagem:.2f}"
                 else:
                     self.txt_valor_mo.value = "0.00"
-                    self.txt_detalhes_motor.value += "\n(Aviso: Preço não encontrado)."
+                    self.txt_detalhes_motor.value += "\n(Aviso: Preço não encontrado na tabela)."
                     self.txt_detalhes_motor.color = ft.Colors.ORANGE_400
         else:
             if not self.editando_orcamento_id:
                 self.txt_valor_mo.value = "0.00"
         
         self.txt_valor_mo.update()
+        self.txt_detalhes_motor.update()
         self.atualizar_totais_tela()
 
     def buscar_preco_rebobinagem(self, cv, fases, polos):
@@ -205,7 +254,18 @@ class OrcamentoForm(ft.Column):
                 if not orcamento: return
                 
                 self.editando_orcamento_id = orcamento_id
-                self.drop_motores.value = str(orcamento.motor_id)
+                
+                motor = next((m for m in self.motores_disponiveis if m.id == orcamento.motor_id), None)
+                if motor:
+                    self.txt_busca_cliente.value = motor.cliente
+                    self.txt_busca_cliente.update()
+                    
+                    self.atualizar_dropdown_motores(motor.cliente)
+                    self.drop_motores.value = str(orcamento.motor_id)
+                    
+                    self.txt_detalhes_motor.value = f"Especificações: {motor.tipo} {motor.marca} | {motor.cv} CV | {motor.fases} | {motor.polos}"
+                    self.txt_detalhes_motor.color = ft.Colors.WHITE
+                
                 self.txt_valor_mo.value = f"{orcamento.valor_mao_de_obra:.2f}"
                 self.switch_rebobinar.value = False
                 self.txt_obs.value = orcamento.observacoes or ""
@@ -217,11 +277,6 @@ class OrcamentoForm(ft.Column):
                         "nome": item.descricao, "qtd": item.quantidade,
                         "preco_uni": item.preco_unitario, "total": item.preco_total
                     })
-                
-                motor = next((m for m in self.motores_disponiveis if m.id == orcamento.motor_id), None)
-                if motor:
-                    self.txt_detalhes_motor.value = f"Especificações: {motor.tipo} {motor.marca} | {motor.cv} CV | {motor.fases} | {motor.polos}"
-                    self.txt_detalhes_motor.color = ft.Colors.WHITE
                 
                 self.btn_salvar.text = "Atualizar Orçamento"
                 self.btn_salvar.bgcolor = ft.Colors.BLUE_700
@@ -235,8 +290,13 @@ class OrcamentoForm(ft.Column):
         self.itens_temporarios_pecas.clear()
         self.txt_valor_mo.value = "0.00"
         self.txt_obs.value = ""
+        
+        self.txt_busca_cliente.value = ""
+        self.txt_busca_cliente.update()
+        self.atualizar_dropdown_motores()
+        
         self.drop_motores.value = None
-        self.txt_detalhes_motor.value = "Selecione um motor para exibir os detalhes."
+        self.txt_detalhes_motor.value = "Digite o nome do cliente ou selecione um motor."
         self.txt_detalhes_motor.color = ft.Colors.GREY_400
         self.btn_salvar.text = "Salvar e Emitir Orçamento"
         self.btn_salvar.bgcolor = ft.Colors.GREEN_700
@@ -300,6 +360,7 @@ class OrcamentoForm(ft.Column):
             self.cancelar_edicao_ativa(None)
             self.txt_detalhes_motor.value = "✅ Orçamento guardado com sucesso!"
             self.txt_detalhes_motor.color = ft.Colors.GREEN_400
+            self.pg.update()
             
             if self.on_save_success:
                 self.on_save_success(orcamento_id_vinculo, motor.cliente)
