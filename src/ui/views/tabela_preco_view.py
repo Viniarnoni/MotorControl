@@ -8,6 +8,21 @@ class TabelaPrecoView(ft.Container):
         super().__init__(expand=True, padding=20)
         self.pg = page  
         
+        # --- VARIÁVEIS PARA A JANELA DE CONFIRMAÇÃO ---
+        self.item_para_excluir_id = None
+        self.item_para_excluir_tipo = None
+        
+        self.dlg_confirmacao = ft.AlertDialog(
+            modal=True,
+            title=ft.Row([ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=ft.Colors.AMBER_400), ft.Text("Confirmar Exclusão")]),
+            content=ft.Text("Tem a certeza de que deseja excluir este item permanentemente?"),
+            actions=[
+                ft.TextButton("Cancelar", on_click=self.fechar_dialogo_exclusao),
+                ft.TextButton("Excluir", icon=ft.Icons.DELETE_FOREVER, icon_color=ft.Colors.RED_400, on_click=self.executar_exclusao),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
         # --- CAMPOS SERVIÇO (Filtro para aceitar números, ponto e barras) ---
         self.txt_serv_cv = ft.TextField(
             label="Potência (CV)", 
@@ -96,7 +111,7 @@ class TabelaPrecoView(ft.Container):
                 ft.DataCell(ft.Text(s.fases)),
                 ft.DataCell(ft.Text(s.polos)),
                 ft.DataCell(ft.Text(f"R$ {s.preco_rebobinagem:.2f}")),
-                ft.DataCell(ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_color=ft.Colors.RED_400, on_click=lambda e, sid=s.id: self.deletar_servico(sid)))
+                ft.DataCell(ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_color=ft.Colors.RED_400, on_click=lambda e, sid=s.id: self.abrir_dialogo_exclusao(sid, "servico")))
             ]))
 
         self.table_pecas.rows.clear()
@@ -104,9 +119,41 @@ class TabelaPrecoView(ft.Container):
             self.table_pecas.rows.append(ft.DataRow(cells=[
                 ft.DataCell(ft.Text(p.nome)),
                 ft.DataCell(ft.Text(f"R$ {p.preco_unitario:.2f}")),
-                ft.DataCell(ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_color=ft.Colors.RED_400, on_click=lambda e, pid=p.id: self.deletar_peca(pid)))
+                ft.DataCell(ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, icon_color=ft.Colors.RED_400, on_click=lambda e, pid=p.id: self.abrir_dialogo_exclusao(pid, "peca")))
             ]))
         self.pg.update()
+
+    # --- LÓGICA CORRIGIDA DA JANELA DE CONFIRMAÇÃO ---
+    def abrir_dialogo_exclusao(self, item_id, tipo):
+        self.item_para_excluir_id = item_id
+        self.item_para_excluir_tipo = tipo
+        
+        # Remove instâncias antigas para evitar sobreposição e adiciona o diálogo atualizado
+        if self.dlg_confirmacao in self.pg.overlay:
+            self.pg.overlay.remove(self.dlg_confirmacao)
+            
+        self.pg.overlay.append(self.dlg_confirmacao)
+        self.dlg_confirmacao.open = True
+        self.pg.update()
+
+    def fechar_dialogo_exclusao(self, e):
+        self.dlg_confirmacao.open = False
+        self.item_para_excluir_id = None
+        self.item_para_excluir_tipo = None
+        self.pg.update()
+
+    def executar_exclusao(self, e):
+        if self.item_para_excluir_tipo == "servico":
+            PrecoServicoRepository.delete(self.item_para_excluir_id)
+        elif self.item_para_excluir_tipo == "peca":
+            PrecoPecaRepository.delete(self.item_para_excluir_id)
+            
+        self.dlg_confirmacao.open = False
+        self.item_para_excluir_id = None
+        self.item_para_excluir_tipo = None
+        self.atualizar_listas()
+        self.pg.update()
+    # ---------------------------------------
 
     def salvar_servico(self, e):
         if not self.txt_serv_cv.value or not self.txt_serv_preco.value:
@@ -121,10 +168,6 @@ class TabelaPrecoView(ft.Container):
         except ValueError:
             pass
 
-    def deletar_servico(self, sid):
-        PrecoServicoRepository.delete(sid)
-        self.atualizar_listas()
-
     def salvar_peca(self, e):
         if not self.txt_peca_nome.value or not self.txt_peca_preco.value:
             return
@@ -137,7 +180,3 @@ class TabelaPrecoView(ft.Container):
             self.atualizar_listas()
         except ValueError:
             pass
-
-    def deletar_peca(self, pid):
-        PrecoPecaRepository.delete(pid)
-        self.atualizar_listas()
