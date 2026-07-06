@@ -15,6 +15,7 @@ class OrcamentoForm(ft.Column):
         self.pecas_disponiveis = []
         self.itens_temporarios_pecas = []
 
+        # Campo de texto para digitar o nome do cliente
         self.txt_busca_cliente = ft.TextField(
             label="Digitar nome do Cliente (Busca rápida)", 
             hint_text="Ex: Saaet, João...",
@@ -28,15 +29,29 @@ class OrcamentoForm(ft.Column):
         
         self.txt_detalhes_motor = ft.Text("Digite o nome do cliente ou selecione um motor.", color=ft.Colors.GREY_400, italic=True)
         
+        # --- SEÇÃO: REBOBINAMENTO (Antiga Mão de Obra de Tabela) ---
         self.switch_rebobinar = ft.Switch(label="Buscar Preço Tabela", value=False, active_color=ft.Colors.BLUE_400)
         self.switch_rebobinar.on_change = self.recalcular_mao_de_obra
         
-        self.txt_valor_mo = ft.TextField(
-            label="Valor Mão de Obra (R$)", value="0.00", width=200, border_color=ft.Colors.BLUE_400,
+        self.txt_valor_rebobinamento = ft.TextField(
+            label="Valor Rebobinamento (R$)", value="0.00", width=200, border_color=ft.Colors.BLUE_400,
             text_align=ft.TextAlign.RIGHT, input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9.]*$", replacement_string="")
         )
-        self.txt_valor_mo.on_change = self.ao_mudar_valor_manual
+        self.txt_valor_rebobinamento.on_change = self.ao_mudar_valor_manual
 
+        # --- NOVO BLOCO: MÃO DE OBRA GERAL / SERVIÇOS ADICIONAIS ---
+        self.txt_desc_mao_de_obra = ft.TextField(
+            label="Descrição da Mão de Obra Geral",
+            hint_text="Ex: Trocar Retentores, aneis oring, vedação, limpeza, desmontagem e montagem...",
+            multiline=True, min_lines=2, max_lines=3, border_color=ft.Colors.BLUE_400, expand=True
+        )
+        self.txt_valor_mao_de_obra = ft.TextField(
+            label="Valor Mão de Obra Geral (R$)", value="0.00", width=200, border_color=ft.Colors.BLUE_400,
+            text_align=ft.TextAlign.RIGHT, input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9.]*$", replacement_string="")
+        )
+        self.txt_valor_mao_de_obra.on_change = self.ao_mudar_valor_manual
+
+        # --- SEÇÃO: PEÇAS ---
         self.drop_pecas = ft.Dropdown(label="Peça/Componente", expand=True, border_color=ft.Colors.GREY_700)
         
         self.txt_qtd_peca = ft.TextField(
@@ -77,16 +92,23 @@ class OrcamentoForm(ft.Column):
             ft.Text("Montador de Orçamentos Automático", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400),
             ft.Divider(color=ft.Colors.GREY_800),
             
-            # Barra superior: Campo de digitação + Dropdown de motores filtrados
             ft.Row([self.txt_busca_cliente, self.drop_motores], spacing=10),
             
             ft.Container(
                 content=ft.Column([
                     self.txt_detalhes_motor,
-                    ft.Row([self.switch_rebobinar, self.txt_valor_mo], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment="center")
+                    ft.Row([self.switch_rebobinar, self.txt_valor_rebobinamento], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment="center")
                 ]), padding=10, bgcolor=ft.Colors.GREY_900, border_radius=5
             ),
+            
             ft.Divider(height=10, color=ft.Colors.GREY_800),
+            
+            # Interface da nova Mão de Obra Manual com Descrição
+            ft.Text("Mão de Obra Geral / Serviços Adicionais (Customizado)", size=15, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_200),
+            ft.Row([self.txt_desc_mao_de_obra, self.txt_valor_mao_de_obra], alignment=ft.MainAxisAlignment.START, vertical_alignment="end"),
+            
+            ft.Divider(height=10, color=ft.Colors.GREY_800),
+            
             ft.Text("Incluir Peças e Componentes na Troca", size=15, weight=ft.FontWeight.BOLD),
             ft.Row([self.drop_pecas, self.row_quantidade, self.btn_add_peca], alignment=ft.MainAxisAlignment.START, vertical_alignment="center"),
             ft.Container(content=ft.ListView([self.table_itens_pecas], expand=True), height=180),
@@ -100,11 +122,9 @@ class OrcamentoForm(ft.Column):
         
         self.carregar_dados_iniciais()
 
-    # --- LÓGICA DE FILTRAGEM DINÂMICA POR DIGITAÇÃO ---
     def ao_digitar_cliente(self, e):
-        # Filtra os motores com base no texto que está sendo digitado
         self.atualizar_dropdown_motores(self.txt_busca_cliente.value)
-        self.drop_motores.value = None  # Reseta a seleção antiga
+        self.drop_motores.value = None
         self.txt_detalhes_motor.value = "Selecione um motor da lista filtrada."
         self.txt_detalhes_motor.color = ft.Colors.GREY_400
         self.recalcular_mao_de_obra(None)
@@ -115,11 +135,8 @@ class OrcamentoForm(ft.Column):
         termo = (texto_filtro or "").lower().strip()
         
         for m in self.motores_disponiveis:
-            # Se o usuário digitou algo, checa se o termo está dentro do nome do cliente
             if termo and termo not in (m.cliente or "").lower():
                 continue
-            
-            # Se já houver um filtro de texto ativo, encurta o texto do drop omitindo o cliente repetido
             if termo:
                 texto_display = f"{m.marca} ({m.cv} CV, {m.polos}) - OS: {m.id}"
             else:
@@ -129,7 +146,6 @@ class OrcamentoForm(ft.Column):
         
         try: self.drop_motores.update()
         except: pass
-    # -------------------------------------------------
 
     def somar_qtd(self, e):
         try:
@@ -153,7 +169,6 @@ class OrcamentoForm(ft.Column):
             from sqlmodel import select
             self.motores_disponiveis = session.exec(select(Motor).where(Motor.is_active == True)).all()
         self.pecas_disponiveis = PrecoPecaRepository.get_all()
-
         self.atualizar_dropdown_motores()
         
         self.drop_pecas.options.clear()
@@ -168,7 +183,6 @@ class OrcamentoForm(ft.Column):
             self.txt_detalhes_motor.value = f"Especificações: {motor.tipo} {motor.marca} | {motor.cv} CV | {motor.fases} | {motor.polos}"
             self.txt_detalhes_motor.color = ft.Colors.WHITE
             
-            # Se escolheu o motor direto sem digitar nada antes, preenche o campo de busca com o dono dele
             if not self.txt_busca_cliente.value:
                 self.txt_busca_cliente.value = motor.cliente
                 self.txt_busca_cliente.update()
@@ -186,16 +200,16 @@ class OrcamentoForm(ft.Column):
             if motor:
                 preco_servico = self.buscar_preco_rebobinagem(motor.cv, motor.fases, motor.polos)
                 if preco_servico:
-                    self.txt_valor_mo.value = f"{preco_servico.preco_rebobinagem:.2f}"
+                    self.txt_valor_rebobinamento.value = f"{preco_servico.preco_rebobinagem:.2f}"
                 else:
-                    self.txt_valor_mo.value = "0.00"
+                    self.txt_valor_rebobinamento.value = "0.00"
                     self.txt_detalhes_motor.value += "\n(Aviso: Preço não encontrado na tabela)."
                     self.txt_detalhes_motor.color = ft.Colors.ORANGE_400
         else:
             if not self.editando_orcamento_id:
-                self.txt_valor_mo.value = "0.00"
+                self.txt_valor_rebobinamento.value = "0.00"
         
-        self.txt_valor_mo.update()
+        self.txt_valor_rebobinamento.update()
         self.txt_detalhes_motor.update()
         self.atualizar_totais_tela()
 
@@ -207,8 +221,12 @@ class OrcamentoForm(ft.Column):
     def ao_mudar_valor_manual(self, e):
         self.atualizar_totais_tela()
 
+    def obter_valor_rebobinamento_seguro(self):
+        try: return float(self.txt_valor_rebobinamento.value)
+        except ValueError: return 0.0
+
     def obter_valor_mo_seguro(self):
-        try: return float(self.txt_valor_mo.value)
+        try: return float(self.txt_valor_mao_de_obra.value)
         except ValueError: return 0.0
 
     def adicionar_peca_lista(self, e):
@@ -241,7 +259,9 @@ class OrcamentoForm(ft.Column):
                 ft.DataCell(ft.Text(f"R$ {item['preco_uni']:.2f}")), ft.DataCell(ft.Text(f"R$ {item['total']:.2f}")),
                 ft.DataCell(ft.IconButton(ft.Icons.DELETE_FOREVER, icon_color=ft.Colors.RED_400, on_click=lambda e, idx=i: self.remover_peca_lista(idx)))
             ]))
-        total_geral = self.obter_valor_mo_seguro() + total_pecas
+        
+        # O TOTAL GERAL agora soma: Rebobinamento + Mão de Obra Geral + Peças
+        total_geral = self.obter_valor_rebobinamento_seguro() + self.obter_valor_mo_seguro() + total_pecas
         self.txt_total_pecas.value = f"Total Peças: R$ {total_pecas:.2f}"
         self.txt_total_geral.value = f"VALOR TOTAL: R$ {total_geral:.2f}"
         self.pg.update()
@@ -259,14 +279,17 @@ class OrcamentoForm(ft.Column):
                 if motor:
                     self.txt_busca_cliente.value = motor.cliente
                     self.txt_busca_cliente.update()
-                    
                     self.atualizar_dropdown_motores(motor.cliente)
                     self.drop_motores.value = str(orcamento.motor_id)
                     
                     self.txt_detalhes_motor.value = f"Especificações: {motor.tipo} {motor.marca} | {motor.cv} CV | {motor.fases} | {motor.polos}"
                     self.txt_detalhes_motor.color = ft.Colors.WHITE
                 
-                self.txt_valor_mo.value = f"{orcamento.valor_mao_de_obra:.2f}"
+                # Resgata os novos valores divididos
+                self.txt_valor_rebobinamento.value = f"{orcamento.valor_rebobinamento:.2f}"
+                self.txt_desc_mao_de_obra.value = orcamento.descricao_mao_de_obra or ""
+                self.txt_valor_mao_de_obra.value = f"{orcamento.valor_mao_de_obra:.2f}"
+                
                 self.switch_rebobinar.value = False
                 self.txt_obs.value = orcamento.observacoes or ""
                 
@@ -288,7 +311,10 @@ class OrcamentoForm(ft.Column):
     def cancelar_edicao_ativa(self, e):
         self.editando_orcamento_id = None
         self.itens_temporarios_pecas.clear()
-        self.txt_valor_mo.value = "0.00"
+        
+        self.txt_valor_rebobinamento.value = "0.00"
+        self.txt_desc_mao_de_obra.value = ""
+        self.txt_valor_mao_de_obra.value = "0.00"
         self.txt_obs.value = ""
         
         self.txt_busca_cliente.value = ""
@@ -314,9 +340,11 @@ class OrcamentoForm(ft.Column):
         motor = next((m for m in self.motores_disponiveis if m.id == motor_id), None)
         if not motor: return
         
+        valor_rebo_final = self.obter_valor_rebobinamento_seguro()
         valor_mo_final = self.obter_valor_mo_seguro()
+        desc_mo_final = self.txt_desc_mao_de_obra.value
         total_pecas = sum(item["total"] for item in self.itens_temporarios_pecas)
-        total_geral = valor_mo_final + total_pecas
+        total_geral = valor_rebo_final + valor_mo_final + total_pecas
         
         try:
             with get_session() as session:
@@ -327,7 +355,12 @@ class OrcamentoForm(ft.Column):
                         orcamento_db.motor_id = motor.id
                         orcamento_db.motor_descricao = f"{motor.marca} {motor.tipo} ({motor.cv}CV)"
                         orcamento_db.cliente_nome = motor.cliente
+                        
+                        # Aloca os novos campos correspondentes
+                        orcamento_db.valor_rebobinamento = valor_rebo_final
+                        orcamento_db.descricao_mao_de_obra = desc_mo_final
                         orcamento_db.valor_mao_de_obra = valor_mo_final
+                        
                         orcamento_db.valor_pecas = total_pecas
                         orcamento_db.valor_total = total_geral
                         orcamento_db.observacoes = self.txt_obs.value
@@ -341,8 +374,14 @@ class OrcamentoForm(ft.Column):
                 else:
                     novo_orcamento = Orcamento(
                         motor_id=motor.id, motor_descricao=f"{motor.marca} {motor.tipo} ({motor.cv}CV)",
-                        cliente_nome=motor.cliente, valor_mao_de_obra=valor_mo_final, valor_pecas=total_pecas,
-                        valor_total=total_geral, observacoes=self.txt_obs.value, status="Pendente"
+                        cliente_nome=motor.cliente, 
+                        valor_rebobinamento=valor_rebo_final,
+                        descricao_mao_de_obra=desc_mo_final,
+                        valor_mao_de_obra=valor_mo_final,
+                        valor_pecas=total_pecas,
+                        valor_total=total_geral, 
+                        observacoes=self.txt_obs.value, 
+                        status="Pendente"
                     )
                     session.add(novo_orcamento)
                     session.commit()

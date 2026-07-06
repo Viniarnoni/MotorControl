@@ -77,28 +77,43 @@ class PDFService:
             ]
         ]
         
-        if orcamento.valor_mao_de_obra > 0:
+        # Descobre o valor real do Rebobinamento subtraindo a Mão de Obra e Peças do Total Geral
+        valor_rebobinagem = orcamento.valor_total - orcamento.valor_mao_de_obra - orcamento.valor_pecas
+        if valor_rebobinagem < 0.01:
+            valor_rebobinagem = 0.0
+
+        # 1. BLOCO DE REBOBINAGEM
+        if valor_rebobinagem > 0:
             if motor:
-                linha1_desc = f"Rebobinar motor elétrico {motor.fases if motor.fases else ''} marca: {motor.marca}"
-                linha2_desc = f"mod: {motor.tipo} CV: {motor.cv} RPM/Pólos: {motor.polos}"
+                # Modificação: Tudo em uma linha e exibindo RPM no lugar de Polos
+                fases_str = f" {motor.fases}" if motor.fases else ""
+                marca_str = f" marca: {motor.marca}" if motor.marca else ""
+                mod_str = f" mod: {motor.tipo}" if motor.tipo else ""
+                cv_str = f" CV: {motor.cv}" if motor.cv else ""
+                rpm_str = f" RPM: {motor.rpm}" if motor.rpm else ""
+                
+                descricao_completa = f"Rebobinar motor elétrico{fases_str}{marca_str}{mod_str}{cv_str}{rpm_str}"
                 
                 dados_tabela_pecas.append([
                     Paragraph("1", estilo_texto),
-                    Paragraph(linha1_desc, estilo_texto),
-                    Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_tabela_dir),
-                    Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_tabela_dir)
-                ])
-                dados_tabela_pecas.append([
-                    Paragraph("", estilo_texto), Paragraph(linha2_desc, estilo_texto), Paragraph("", estilo_texto), Paragraph("", estilo_texto)
+                    Paragraph(descricao_completa, estilo_texto),
+                    Paragraph(f"R$ {valor_rebobinagem:.2f}", estilo_tabela_dir),
+                    Paragraph(f"R$ {valor_rebobinagem:.2f}", estilo_tabela_dir)
                 ])
             else:
                 dados_tabela_pecas.append([
                     Paragraph("1", estilo_texto),
-                    Paragraph(f"Serviço de Mão de Obra / Manutenção: {orcamento.motor_descricao}", estilo_texto),
-                    Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_tabela_dir),
-                    Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_tabela_dir)
+                    Paragraph(f"Serviço de Rebobinagem: {orcamento.motor_descricao}", estilo_texto),
+                    Paragraph(f"R$ {valor_rebobinagem:.2f}", estilo_tabela_dir),
+                    Paragraph(f"R$ {valor_rebobinagem:.2f}", estilo_tabela_dir)
                 ])
+            
+            # Pula uma linha em branco após o bloco de Rebobinagem
+            dados_tabela_pecas.append([
+                Paragraph("", estilo_texto), Paragraph("", estilo_texto), Paragraph("", estilo_texto), Paragraph("", estilo_texto)
+            ])
 
+        # 2. BLOCO DE PEÇAS E COMPONENTES
         for item in itens_pecas:
             dados_tabela_pecas.append([
                 Paragraph(str(item.quantidade), estilo_texto),
@@ -106,7 +121,28 @@ class PDFService:
                 Paragraph(f"R$ {item.preco_unitario:.2f}", estilo_tabela_dir),
                 Paragraph(f"R$ {item.preco_total:.2f}", estilo_tabela_dir)
             ])
+            # Pula uma linha em branco após cada peça para manter o espaçamento do modelo
+            dados_tabela_pecas.append([
+                Paragraph("", estilo_texto), Paragraph("", estilo_texto), Paragraph("", estilo_texto), Paragraph("", estilo_texto)
+            ])
+
+        # 3. BLOCO EXCLUSIVO DE MÃO DE OBRA GERAL
+        if orcamento.valor_mao_de_obra > 0:
+            # Modificação: Pega o texto digitado no formulário ou usa um padrão se estiver vazio
+            desc_mao_de_obra = orcamento.descricao_mao_de_obra if orcamento.descricao_mao_de_obra else "Mão de Obra Geral / Serviços de Montagem"
             
+            dados_tabela_pecas.append([
+                Paragraph("", estilo_texto),
+                Paragraph(desc_mao_de_obra, estilo_texto),
+                Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_tabela_dir),
+                Paragraph(f"R$ {orcamento.valor_mao_de_obra:.2f}", estilo_tabela_dir)
+            ])
+            # Pula uma linha em branco após a mão de obra
+            dados_tabela_pecas.append([
+                Paragraph("", estilo_texto), Paragraph("", estilo_texto), Paragraph("", estilo_texto), Paragraph("", estilo_texto)
+            ])
+            
+        # Preenche o restante da tabela com linhas vazias até atingir a estrutura fixa visual
         linhas_atuais = len(dados_tabela_pecas)
         for _ in range(max(0, 15 - linhas_atuais)):
             dados_tabela_pecas.append([
@@ -162,7 +198,6 @@ class PDFService:
         print(f"Nome do cliente recebido do orçamento: '{nome_cliente}'")
         print(f"Telefone recebido direto da tela: '{telefone}'")
 
-        # BUSCA AUTOMÁTICA SE VIER VAZIO
         if not telefone or str(telefone).strip() == "":
             print(f"Telefone vazio! Iniciando varredura no banco de dados...")
             try:
@@ -185,7 +220,7 @@ class PDFService:
 
         print(f"Telefone final processado antes de gerar o link: '{telefone}'")
 
-        mensagem = f"Olá, {nome_cliente}! Segue o orçamento do serviço da Eletrorecuperadora. 🛠️⚡"
+        mensagem = f"Olá, {nome_cliente}! Segue o orçamento do serviço da Eletrorecuperadora."
         mensagem_codificada = urllib.parse.quote(mensagem)
         
         telefone_limpo = "".join(filter(str.isdigit, str(telefone))) if telefone else ""

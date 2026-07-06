@@ -27,7 +27,6 @@ class Motor(SQLModel, table=True):
     caminho_foto: Optional[str] = None
     data_entrada: date = Field(default_factory=date.today)
     
-    # --- CAMPO RESTAURADO AQUI ---
     is_active: bool = Field(default=True)
 
 class PrecoServico(SQLModel, table=True):
@@ -48,7 +47,12 @@ class Orcamento(SQLModel, table=True):
     motor_descricao: str         
     cliente_nome: str            
     data_emissao: date = Field(default_factory=date.today)
-    valor_mao_de_obra: float = 0.0
+    
+    # --- NOVOS CAMPOS SEPARADOS ---
+    valor_rebobinamento: float = 0.0  # Antigo valor_mao_de_obra geral
+    descricao_mao_de_obra: Optional[str] = None  # Texto customizado (Ex: Trocar retentores...)
+    valor_mao_de_obra: float = 0.0  # Valor da mão de obra geral descrita acima
+    
     valor_pecas: float = 0.0
     valor_total: float = 0.0
     observacoes: Optional[str] = None
