@@ -220,7 +220,7 @@ class PDFService:
 
         print(f"Telefone final processado antes de gerar o link: '{telefone}'")
 
-        mensagem = f"Olá, {nome_cliente}! Segue o orçamento do serviço da Eletrorecuperadora."
+        mensagem = f"Olá, {nome_cliente}! Segue o orçamento solicitado."
         mensagem_codificada = urllib.parse.quote(mensagem)
         
         telefone_limpo = "".join(filter(str.isdigit, str(telefone))) if telefone else ""
