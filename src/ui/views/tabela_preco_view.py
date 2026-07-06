@@ -23,12 +23,9 @@ class TabelaPrecoView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        # --- CAMPOS SERVIÇO (Filtro para aceitar números, ponto e barras) ---
+        # --- CAMPOS SERVIÇO ---
         self.txt_serv_cv = ft.TextField(
-            label="Potência (CV)", 
-            hint_text="Ex: 1, 1.5, 1/2", 
-            width=120, 
-            border_color=ft.Colors.GREY_700,
+            label="Potência (CV)", hint_text="Ex: 1, 1.5, 1/2", width=120, border_color=ft.Colors.GREY_700,
             input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9\./\\]*$", replacement_string="")
         )
         self.drop_serv_fases = ft.Dropdown(
@@ -87,6 +84,47 @@ class TabelaPrecoView(ft.Container):
         
         self.atualizar_listas()
 
+    # --- NOTIFICAÇÃO FLUTUANTE CUSTOMIZADA (BLINDADA VIA OVERLAY) ---
+    def mostrar_snackbar(self, mensagem: str, cor: str):
+        import threading
+        import time
+
+        # Define um ícone bonito baseado no tipo de mensagem
+        icone = ft.Icons.INFO_ROUNDED
+        if "✅" in mensagem:
+            icone = ft.Icons.CHECK_CIRCLE_ROUNDED
+            mensagem = mensagem.replace("✅", "").strip()
+        elif "⚠️" in mensagem:
+            icone = ft.Icons.WARNING_ROUNDED
+            mensagem = mensagem.replace("⚠️", "").strip()
+
+        # Cria um container flutuante customizado
+        toast = ft.Container(
+            content=ft.Row([
+                ft.Icon(icone, color=ft.Colors.WHITE, size=20),
+                ft.Text(mensagem, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD, size=14),
+            ], alignment=ft.MainAxisAlignment.START, tight=True, spacing=10),
+            bgcolor=cor,
+            padding=15,
+            border_radius=10,
+            bottom=30,  
+            right=30,   
+            shadow=ft.BoxShadow(blur_radius=10, color="#40000000"), 
+        )
+
+        # Adiciona à camada flutuante da página e atualiza
+        self.pg.overlay.append(toast)
+        self.pg.update()
+
+        # Função em segundo plano para fazer o aviso sumir sozinho após 3 segundos
+        def fechar_toast():
+            time.sleep(3)
+            if toast in self.pg.overlay:
+                self.pg.overlay.remove(toast)
+                self.pg.update()
+
+        threading.Thread(target=fechar_toast, daemon=True).start()
+
     def clique_aba_servicos(self, e):
         self.btn_servicos.bgcolor = ft.Colors.BLUE_800
         self.btn_servicos.color = ft.Colors.WHITE
@@ -123,15 +161,11 @@ class TabelaPrecoView(ft.Container):
             ]))
         self.pg.update()
 
-    # --- LÓGICA CORRIGIDA DA JANELA DE CONFIRMAÇÃO ---
     def abrir_dialogo_exclusao(self, item_id, tipo):
         self.item_para_excluir_id = item_id
         self.item_para_excluir_tipo = tipo
-        
-        # Remove instâncias antigas para evitar sobreposição e adiciona o diálogo atualizado
         if self.dlg_confirmacao in self.pg.overlay:
             self.pg.overlay.remove(self.dlg_confirmacao)
-            
         self.pg.overlay.append(self.dlg_confirmacao)
         self.dlg_confirmacao.open = True
         self.pg.update()
@@ -152,31 +186,48 @@ class TabelaPrecoView(ft.Container):
         self.item_para_excluir_id = None
         self.item_para_excluir_tipo = None
         self.atualizar_listas()
-        self.pg.update()
-    # ---------------------------------------
+        
+        # Mostra o aviso de exclusão
+        self.mostrar_snackbar("✅ Item excluído com sucesso!", ft.Colors.AMBER_800)
 
     def salvar_servico(self, e):
+        # Validação: Se os campos estiverem vazios, mostra erro
         if not self.txt_serv_cv.value or not self.txt_serv_preco.value:
+            self.mostrar_snackbar("⚠️ Preencha a Potência e o Preço para adicionar!", ft.Colors.RED_600)
             return
+        
         try:
             val = float(self.txt_serv_preco.value)
             novo = PrecoServico(cv=self.txt_serv_cv.value, fases=self.drop_serv_fases.value, polos=self.drop_serv_polos.value, preco_rebobinagem=val)
             PrecoServicoRepository.create(novo)
+            
             self.txt_serv_cv.value = ""
             self.txt_serv_preco.value = ""
             self.atualizar_listas()
+            
+            # Mostra o aviso de sucesso
+            self.mostrar_snackbar("✅ Preço de Mão de Obra cadastrado!", ft.Colors.GREEN_700)
+            
         except ValueError:
-            pass
+            self.mostrar_snackbar("⚠️ Valor de preço inválido!", ft.Colors.RED_600)
 
     def salvar_peca(self, e):
+        # Validação: Se os campos estiverem vazios, mostra erro
         if not self.txt_peca_nome.value or not self.txt_peca_preco.value:
+            self.mostrar_snackbar("⚠️ Preencha o Nome e o Preço da peça!", ft.Colors.RED_600)
             return
+            
         try:
             val = float(self.txt_peca_preco.value)
             nova = PrecoPeca(nome=self.txt_peca_nome.value, preco_unitario=val)
             PrecoPecaRepository.create(nova)
+            
             self.txt_peca_nome.value = ""
             self.txt_peca_preco.value = ""
             self.atualizar_listas()
+            
+            # Mostra o aviso de sucesso
+            self.mostrar_snackbar("✅ Peça cadastrada com sucesso!", ft.Colors.GREEN_700)
+            
         except ValueError:
-            pass
+            self.mostrar_snackbar("⚠️ Valor de preço inválido!", ft.Colors.RED_600)
