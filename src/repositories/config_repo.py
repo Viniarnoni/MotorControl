@@ -8,12 +8,7 @@ class ConfigRepository:
     DEFAULTS = {
         "empresa_nome": "ELETRORECUPERADORA",
         "empresa_linha_1": "FELIPE BARRERE ARNONI-MEI CNPJ: 35.032.089/0001-52   Tel:(16) 3252-6033/(16) 98131-5311",
-        "empresa_linha_2": "Rua: Ennes Reis Rodrigues, 113 - Jardim Bela Vista - CEP:  15905-004 - Taquaritinga-SP",
-        "empresa_cnpj": "35.032.089/0001-52",
-        "empresa_telefone": "(16) 3252-6033 / (16) 98131-5311",
-        "empresa_endereco": "Rua: Ennes Reis Rodrigues, 113 - Jardim Bela Vista",
-        "empresa_cep": "15905-004",
-        "empresa_cidade_estado": "Taquaritinga-SP",
+        "empresa_linha_2": "Rua: Ennes Reis Rodrigues, 113 - Jardim Bela Vista - CEP: 15905-004 - Taquaritinga-SP",
     }
 
     @staticmethod
@@ -30,51 +25,46 @@ class ConfigRepository:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS config (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL DEFAULT ''
+                chave TEXT PRIMARY KEY,
+                valor TEXT NOT NULL DEFAULT ''
             )
             """
         )
         return conn
 
     @classmethod
-    def get(cls, key: str, default: str = "") -> str:
-        with cls._connect() as conn:
-            row = conn.execute(
-                "SELECT value FROM config WHERE key = ?",
-                (key,),
-            ).fetchone()
-        if row:
-            return row[0]
-        return cls.DEFAULTS.get(key, default)
+    def _garantir_tabela(cls):
+        with cls._connect():
+            pass
 
     @classmethod
-    def set(cls, key: str, value: str) -> None:
+    def obter_por_chave(cls, chave: str, padrao: str = "") -> str:
+        with cls._connect() as conn:
+            row = conn.execute(
+                "SELECT valor FROM config WHERE chave = ?",
+                (chave,),
+            ).fetchone()
+        if row and row[0] is not None:
+            return row[0]
+        return cls.DEFAULTS.get(chave, padrao)
+
+    @classmethod
+    def salvar_chave(cls, chave: str, valor: str):
         with cls._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO config (key, value)
+                INSERT INTO config (chave, valor)
                 VALUES (?, ?)
-                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor
                 """,
-                (key, value or ""),
+                (chave, str(valor or "")),
             )
             conn.commit()
 
     @classmethod
     def get_company_data(cls) -> dict[str, str]:
-        return {key: cls.get(key, default) for key, default in cls.DEFAULTS.items()}
-
-    @classmethod
-    def save_company_data(cls, data: dict[str, str]) -> None:
-        with cls._connect() as conn:
-            for key in cls.DEFAULTS:
-                conn.execute(
-                    """
-                    INSERT INTO config (key, value)
-                    VALUES (?, ?)
-                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
-                    """,
-                    (key, data.get(key, "")),
-                )
-            conn.commit()
+        return {
+            "empresa_nome": cls.obter_por_chave("empresa_nome", cls.DEFAULTS["empresa_nome"]),
+            "empresa_linha_1": cls.obter_por_chave("empresa_linha_1", cls.DEFAULTS["empresa_linha_1"]),
+            "empresa_linha_2": cls.obter_por_chave("empresa_linha_2", cls.DEFAULTS["empresa_linha_2"]),
+        }

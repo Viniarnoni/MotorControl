@@ -1,5 +1,6 @@
-﻿import sys
 import os
+import sys
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import flet as ft
@@ -33,6 +34,8 @@ def main(page: ft.Page):
             conteudo_central.content = TabelaPrecoView(page)
         elif e.control.selected_index == 4:
             conteudo_central.content = OrcamentoView(page)
+        elif e.control.selected_index == 5:
+            conteudo_central.content = ConfigView(page)
             
         page.update()
 
@@ -48,6 +51,7 @@ def main(page: ft.Page):
             ft.NavigationRailDestination(icon=ft.Icons.PEOPLE_ROUNDED, label='Clientes'),
             ft.NavigationRailDestination(icon=ft.Icons.ATTACH_MONEY_ROUNDED, label='Preços'),
             ft.NavigationRailDestination(icon=ft.Icons.REQUEST_QUOTE_ROUNDED, label='Orçamentos'),
+            ft.NavigationRailDestination(icon=ft.Icons.SETTINGS, label='Configurações'),
         ],
         on_change=mudar_tela
     )

@@ -1,90 +1,131 @@
-import flet as ft
+import shutil
+from datetime import datetime
+from pathlib import Path
 
+import flet as ft
 from src.repositories.config_repo import ConfigRepository
 
-
-class ConfigView:
+class ConfigView(ft.Container):
     def __init__(self, page: ft.Page):
-        self.page = page
-        self.campos = {
-            "empresa_nome": ft.TextField(label="Nome da Empresa", border_color=ft.Colors.BLUE_400),
-            "empresa_cnpj": ft.TextField(label="CNPJ", border_color=ft.Colors.BLUE_400),
-            "empresa_telefone": ft.TextField(label="Telefone", border_color=ft.Colors.BLUE_400),
-            "empresa_endereco": ft.TextField(label="Endereço", border_color=ft.Colors.BLUE_400),
-            "empresa_cep": ft.TextField(label="CEP", border_color=ft.Colors.BLUE_400),
-            "empresa_cidade_estado": ft.TextField(label="Cidade / Estado", border_color=ft.Colors.BLUE_400),
-            "empresa_linha_1": ft.TextField(
-                label="Linha 1 do Cabeçalho",
-                multiline=True,
-                min_lines=2,
-                max_lines=3,
-                border_color=ft.Colors.BLUE_400,
-            ),
-            "empresa_linha_2": ft.TextField(
-                label="Linha 2 do Cabeçalho",
-                multiline=True,
-                min_lines=2,
-                max_lines=3,
-                border_color=ft.Colors.BLUE_400,
-            ),
-        }
+        super().__init__(expand=True, padding=20)
+        self.pg = page
 
-        self._carregar_dados()
+        # --- CAMPOS DE TEXTO ---
+        self.txt_nome = ft.TextField(label="Nome da Empresa", expand=True)
+        self.txt_linha1 = ft.TextField(label="Documentos / CNPJ / Inscrição", expand=True)
+        self.txt_linha2 = ft.TextField(label="Endereço / Contato / Telefone", expand=True)
 
-    def _carregar_dados(self):
-        dados = ConfigRepository.get_company_data()
-        for chave, campo in self.campos.items():
-            campo.value = dados.get(chave, "")
+        # Carrega os dados existentes ao iniciar a tela
+        self.carregar_dados()
 
-    def salvar(self, e):
-        ConfigRepository.save_company_data(
-            {chave: campo.value.strip() for chave, campo in self.campos.items()}
-        )
-        self.page.snack_bar = ft.SnackBar(
-            ft.Text("Configurações da empresa salvas com sucesso."),
-            bgcolor=ft.Colors.GREEN_700,
-        )
-        self.page.snack_bar.open = True
-        self.page.update()
+        # --- LAYOUT VISUAL ---
+        self.content = ft.Column([
+            ft.Row([
+                ft.Icon(ft.Icons.SETTINGS_ROUNDED, color=ft.Colors.BLUE_600, size=30),
+                ft.Text("Configurações da Empresa", size=24, weight=ft.FontWeight.BOLD),
+            ], alignment=ft.MainAxisAlignment.START),
+            ft.Divider(height=10, color=ft.Colors.GREY_300),
+            ft.Container(height=10),
 
-    def build(self):
-        return ft.Container(
-            expand=True,
-            padding=30,
-            content=ft.Column(
-                [
-                    ft.Text("Configurações da Empresa", size=28, weight=ft.FontWeight.BOLD),
-                    ft.Text(
-                        "Edite os dados usados no cabeçalho do PDF.",
-                        color=ft.Colors.GREY_400,
-                    ),
-                    ft.Divider(height=15, color=ft.Colors.GREY_800),
-                    self.campos["empresa_nome"],
-                    ft.Row(
-                        [self.campos["empresa_cnpj"], self.campos["empresa_telefone"]],
-                        spacing=15,
-                    ),
-                    self.campos["empresa_endereco"],
-                    ft.Row(
-                        [self.campos["empresa_cep"], self.campos["empresa_cidade_estado"]],
-                        spacing=15,
-                    ),
-                    self.campos["empresa_linha_1"],
-                    self.campos["empresa_linha_2"],
-                    ft.Row(
-                        [
-                            ft.Button(
-                                "Salvar",
-                                icon=ft.Icons.SAVE,
-                                bgcolor=ft.Colors.BLUE_700,
+            ft.Card(
+                content=ft.Container(
+                    padding=20,
+                    content=ft.Column([
+                        ft.Text("Dados do Cabeçalho do PDF", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_GREY_700),
+                        ft.Container(height=5),
+                        
+                        ft.Row([self.txt_nome]),
+                        ft.Row([self.txt_linha1]),
+                        ft.Row([self.txt_linha2]),
+                        
+                        ft.Container(height=15),
+                        
+                        ft.Row([
+                            ft.ElevatedButton(
+                                "Salvar Alterações",
+                                icon=ft.Icons.SAVE_ROUNDED,
+                                bgcolor=ft.Colors.BLUE_600,
                                 color=ft.Colors.WHITE,
-                                on_click=self.salvar,
+                                height=45,
+                                on_click=self.salvar_dados
                             )
-                        ],
-                        alignment=ft.MainAxisAlignment.END,
-                    ),
-                ],
-                scroll=ft.ScrollMode.AUTO,
-                spacing=15,
+                        ], alignment=ft.MainAxisAlignment.END)
+                    ], spacing=15)
+                ),
+                elevation=2
             ),
-        )
+            ft.Card(
+                content=ft.Container(
+                    padding=20,
+                    content=ft.Column([
+                        ft.Text("Segurança e Backup", size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_GREY_700),
+                        ft.Text(
+                            "Crie uma cópia do banco de dados atual na pasta de backups do projeto.",
+                            color=ft.Colors.GREY_500,
+                        ),
+                        ft.Row([
+                            ft.ElevatedButton(
+                                "Gerar Backup do Sistema",
+                                icon=ft.Icons.SAVE_ALT,
+                                bgcolor=ft.Colors.BLUE_600,
+                                color=ft.Colors.WHITE,
+                                height=45,
+                                on_click=self.gerar_backup
+                            )
+                        ], alignment=ft.MainAxisAlignment.END)
+                    ], spacing=15)
+                ),
+                elevation=2
+            )
+        ], spacing=10, scroll=ft.ScrollMode.AUTO)
+
+    def carregar_dados(self):
+        """Busca os dados guardados no banco."""
+        self.txt_nome.value = ConfigRepository.obter_por_chave("empresa_nome", "ELETRORECUPERADORA PADRÃO LTDA")
+        self.txt_linha1.value = ConfigRepository.obter_por_chave("empresa_linha_1", "CNPJ: 00.000.000/0001-00")
+        self.txt_linha2.value = ConfigRepository.obter_por_chave("empresa_linha_2", "Rua das Oficinas, 123 - Tel: (00) 0000-0000")
+
+    def salvar_dados(self, e):
+        """Salva as alterações."""
+        if not self.txt_nome.value.strip():
+            self.txt_nome.error_text = "O nome da empresa é obrigatório!"
+            self.pg.update()
+            return
+            
+        self.txt_nome.error_text = None
+        
+        ConfigRepository.salvar_chave("empresa_nome", self.txt_nome.value)
+        ConfigRepository.salvar_chave("empresa_linha_1", self.txt_linha1.value)
+        ConfigRepository.salvar_chave("empresa_linha_2", self.txt_linha2.value)
+
+        # SnackBar simples de sucesso imune a bugs de versão
+        self.pg.snack_bar = ft.SnackBar(ft.Text("✅ Configurações salvas com sucesso!"), bgcolor=ft.Colors.GREEN_700)
+        self.pg.snack_bar.open = True
+        self.pg.update()
+
+    def gerar_backup(self, e):
+        try:
+            raiz_projeto = Path(__file__).resolve().parents[3]
+            banco_origem = raiz_projeto / "motorcontrol.db"
+            pasta_backup = raiz_projeto / "backups"
+            pasta_backup.mkdir(exist_ok=True)
+
+            if not banco_origem.exists():
+                raise FileNotFoundError("Arquivo do banco de dados não encontrado.")
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+            arquivo_backup = pasta_backup / f"backup_motorcontrol_{timestamp}.db"
+            shutil.copy2(banco_origem, arquivo_backup)
+
+            self.pg.snack_bar = ft.SnackBar(
+                ft.Text(f"Backup salvo com sucesso em: {arquivo_backup}"),
+                bgcolor=ft.Colors.GREEN_700,
+            )
+        except Exception as ex:
+            self.pg.snack_bar = ft.SnackBar(
+                ft.Text(f"Erro ao gerar backup: {ex}"),
+                bgcolor=ft.Colors.RED_700,
+            )
+
+        self.pg.snack_bar.open = True
+        self.pg.update()

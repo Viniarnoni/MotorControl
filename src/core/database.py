@@ -1,4 +1,4 @@
-﻿from sqlmodel import SQLModel, create_engine, Session
+from sqlmodel import SQLModel, create_engine, Session
 from src.models.entities import Cliente, Motor
 
 DATABASE_URL = "sqlite:///motorcontrol.db"
@@ -9,6 +9,8 @@ engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 def init_db():
     """Cria o banco de dados e as tabelas automaticamente se não existirem."""
     SQLModel.metadata.create_all(engine)
+    from src.migration import migrate_db
+    migrate_db()
 
 def get_session():
     """Gera uma nova sessão de banco de dados para operações."""
