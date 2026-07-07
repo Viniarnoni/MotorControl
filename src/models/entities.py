@@ -58,6 +58,13 @@ class Orcamento(SQLModel, table=True):
     observacoes: Optional[str] = None
     status: str = Field(default="Pendente") 
 
+    def calcular_total(self) -> float:
+        return (
+            (self.valor_mao_de_obra or 0.0)
+            + (self.valor_rebobinamento or 0.0)
+            + (self.valor_pecas or 0.0)
+        )
+
 class ItemOrcamento(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     orcamento_id: int

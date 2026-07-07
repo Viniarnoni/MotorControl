@@ -260,8 +260,16 @@ class OrcamentoForm(ft.Column):
                 ft.DataCell(ft.IconButton(ft.Icons.DELETE_FOREVER, icon_color=ft.Colors.RED_400, on_click=lambda e, idx=i: self.remover_peca_lista(idx)))
             ]))
         
-        # O TOTAL GERAL agora soma: Rebobinamento + Mão de Obra Geral + Peças
-        total_geral = self.obter_valor_rebobinamento_seguro() + self.obter_valor_mo_seguro() + total_pecas
+        # Centraliza o calculo total na entidade Orcamento.
+        orcamento_preview = Orcamento(
+            motor_id=0,
+            motor_descricao="",
+            cliente_nome="",
+            valor_rebobinamento=self.obter_valor_rebobinamento_seguro(),
+            valor_mao_de_obra=self.obter_valor_mo_seguro(),
+            valor_pecas=total_pecas,
+        )
+        total_geral = orcamento_preview.calcular_total()
         self.txt_total_pecas.value = f"Total Peças: R$ {total_pecas:.2f}"
         self.txt_total_geral.value = f"VALOR TOTAL: R$ {total_geral:.2f}"
         self.pg.update()
@@ -344,7 +352,6 @@ class OrcamentoForm(ft.Column):
         valor_mo_final = self.obter_valor_mo_seguro()
         desc_mo_final = self.txt_desc_mao_de_obra.value
         total_pecas = sum(item["total"] for item in self.itens_temporarios_pecas)
-        total_geral = valor_rebo_final + valor_mo_final + total_pecas
         
         try:
             with get_session() as session:
@@ -362,7 +369,7 @@ class OrcamentoForm(ft.Column):
                         orcamento_db.valor_mao_de_obra = valor_mo_final
                         
                         orcamento_db.valor_pecas = total_pecas
-                        orcamento_db.valor_total = total_geral
+                        orcamento_db.valor_total = orcamento_db.calcular_total()
                         orcamento_db.observacoes = self.txt_obs.value
                         session.add(orcamento_db)
                         session.commit()
@@ -379,10 +386,10 @@ class OrcamentoForm(ft.Column):
                         descricao_mao_de_obra=desc_mo_final,
                         valor_mao_de_obra=valor_mo_final,
                         valor_pecas=total_pecas,
-                        valor_total=total_geral, 
                         observacoes=self.txt_obs.value, 
                         status="Pendente"
                     )
+                    novo_orcamento.valor_total = novo_orcamento.calcular_total()
                     session.add(novo_orcamento)
                     session.commit()
                     session.refresh(novo_orcamento)

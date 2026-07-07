@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import subprocess
 from datetime import datetime
@@ -77,8 +77,7 @@ class PDFService:
             ]
         ]
         
-        # Descobre o valor real do Rebobinamento subtraindo a Mão de Obra e Peças do Total Geral
-        valor_rebobinagem = orcamento.valor_total - orcamento.valor_mao_de_obra - orcamento.valor_pecas
+        valor_rebobinagem = orcamento.valor_rebobinamento or 0.0
         if valor_rebobinagem < 0.01:
             valor_rebobinagem = 0.0
 
@@ -166,7 +165,7 @@ class PDFService:
             [
                 Paragraph(f"<b>Data:</b> {data_str}", estilo_texto),
                 Paragraph("<b>Ass:</b> Felipe Barrere Arnoni", estilo_tabela_centro),
-                Paragraph(f"<b>TOTAL: R$: {orcamento.valor_total:.2f}</b>", estilo_tabela_dir)
+                Paragraph(f"<b>TOTAL: R$: {orcamento.calcular_total():.2f}</b>", estilo_tabela_dir)
             ]
         ]
         tabela_rodape = Table(dados_rodape, colWidths=[150, 225, 150])

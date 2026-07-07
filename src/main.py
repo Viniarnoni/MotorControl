@@ -1,4 +1,8 @@
-﻿import flet as ft
+﻿import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import flet as ft
 from src.core.database import init_db
 from src.ui.views.dashboard_view import DashboardView
 from src.ui.views.motor_view import MotorView
