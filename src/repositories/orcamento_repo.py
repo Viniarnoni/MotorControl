@@ -1,4 +1,4 @@
-﻿from sqlmodel import select
+﻿from sqlmodel import select, func
 from src.core.database import get_session
 from src.models.entities import Orcamento, ItemOrcamento
 #from src.models.entities import Orcamento, StatusOrcamento
@@ -41,3 +41,72 @@ class OrcamentoRepository:
         except Exception as e:
             print(f"Erro ao contar status: {e}")
             return 0, 0, 0, 0
+
+    @staticmethod
+    def obter_resumo_financeiro():
+        try:
+            with get_session() as session:
+                orcamentos = session.exec(select(Orcamento)).all()
+                total_orcamentos = len(orcamentos)
+                faturamento_estimado = sum((o.valor_total or 0.0) for o in orcamentos)
+                ticket_medio = (
+                    faturamento_estimado / total_orcamentos
+                    if total_orcamentos > 0
+                    else 0.0
+                )
+
+                return {
+                    "total_orcamentos": total_orcamentos,
+                    "faturamento_estimado": faturamento_estimado,
+                    "ticket_medio": ticket_medio,
+                }
+        except Exception as e:
+            print(f"Erro ao obter resumo financeiro: {e}")
+            return {
+                "total_orcamentos": 0,
+                "faturamento_estimado": 0.0,
+                "ticket_medio": 0.0,
+            }
+
+    @staticmethod
+    def obter_ultimos_orcamentos(limit: int = 5):
+        try:
+            with get_session() as session:
+                statement = select(Orcamento).order_by(Orcamento.id.desc()).limit(limit)
+                return list(session.exec(statement).all())
+        except Exception as e:
+            print(f"Erro ao obter últimos orçamentos: {e}")
+            return []
+
+    @staticmethod
+    def obter_funil_status():
+        try:
+            with get_session() as session:
+                statement = (
+                    select(Orcamento.status, func.count(Orcamento.id))
+                    .group_by(Orcamento.status)
+                )
+                rows = session.exec(statement).all()
+
+                funil = {
+                    "Pendente": 0,
+                    "Aprovado": 0,
+                    "Finalizado": 0,
+                    "Recusado": 0,
+                }
+
+                for status, quantidade in rows:
+                    if status == "Reprovado":
+                        funil["Recusado"] += quantidade
+                    elif status in funil:
+                        funil[status] += quantidade
+
+                return funil
+        except Exception as e:
+            print(f"Erro ao obter funil por status: {e}")
+            return {
+                "Pendente": 0,
+                "Aprovado": 0,
+                "Finalizado": 0,
+                "Recusado": 0,
+            }
