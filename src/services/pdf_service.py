@@ -10,12 +10,14 @@ from reportlab.lib import colors
 from sqlmodel import select
 from src.core.database import get_session
 from src.models.entities import Orcamento, ItemOrcamento, Motor
+from src.repositories.config_repo import ConfigRepository
 
 class PDFService:
     @staticmethod
     def gerar_pdf(orcamento_id: int) -> str:
         pasta_saida = Path("orcamentos_emitidos")
         pasta_saida.mkdir(exist_ok=True)
+        dados_empresa = ConfigRepository.get_company_data()
         
         arquivo_pdf = pasta_saida / f"Orcamento_{orcamento_id}.pdf"
         
@@ -46,9 +48,9 @@ class PDFService:
         estilo_tabela_dir = ParagraphStyle('TabDir', parent=estilo_texto, alignment=2)
         
         # --- CABEÇALHO ---
-        story.append(Paragraph("ELETRORECUPERADORA", estilo_cabecalho_titulo))
-        story.append(Paragraph("FELIPE BARRERE ARNONI-MEI CNPJ: 35.032.089/0001-52   Tel:(16) 3252-6033/(16) 98131-5311", estilo_cabecalho_texto))
-        story.append(Paragraph("Rua: Ennes Reis Rodrigues, 113 - Jardim Bela Vista - CEP:  15905-004 - Taquaritinga-SP", estilo_cabecalho_endereco))
+        story.append(Paragraph(dados_empresa["empresa_nome"], estilo_cabecalho_titulo))
+        story.append(Paragraph(dados_empresa["empresa_linha_1"], estilo_cabecalho_texto))
+        story.append(Paragraph(dados_empresa["empresa_linha_2"], estilo_cabecalho_endereco))
         
         story.append(Paragraph("ORÇAMENTO", estilo_orcamento))
         
