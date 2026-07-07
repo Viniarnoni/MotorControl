@@ -58,7 +58,7 @@ class PDFService:
         dados_cliente = [
             [Paragraph(f"<b>Para:</b> {orcamento.cliente_nome}", estilo_texto), Paragraph("<b>CNPJ:</b> ________________", estilo_texto), ""],
             [Paragraph("<b>Endereço:</b> __________________________________", estilo_texto), Paragraph("<b>nº:</b> ____", estilo_texto), Paragraph("<b>Tel:</b> ________________", estilo_texto)],
-            [Paragraph("<b>Cidade:</b> Taquaritinga", estilo_texto), Paragraph("<b>Bairro:</b> Centro", estilo_texto), Paragraph("<b>Estado:</b> São Paulo", estilo_texto)]
+            [Paragraph("<b>Cidade:</b> Taquaritinga", estilo_texto), Paragraph("<b>Bairro:</b> ", estilo_texto), Paragraph("<b>Estado:</b> São Paulo", estilo_texto)]
         ]
         tabela_cliente = Table(dados_cliente, colWidths=[240, 140, 145])
         tabela_cliente.setStyle(TableStyle([
