@@ -4,15 +4,35 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from sqlmodel import select
 from src.core.database import get_session
-from src.models.entities import Orcamento, ItemOrcamento, Motor
+from src.core.paths import get_logo_path
+from src.models.entities import Orcamento, ItemOrcamento, Motor, Cliente
 from src.repositories.config_repo import ConfigRepository
 
 class PDFService:
+    @staticmethod
+    def _buscar_cliente_por_nome(session, nome_cliente: str):
+        if not nome_cliente or not nome_cliente.strip():
+            return None
+        nome_alvo = nome_cliente.strip().lower()
+        for cliente in session.exec(select(Cliente)).all():
+            if cliente.nome and cliente.nome.strip().lower() == nome_alvo:
+                return cliente
+        return None
+
+    @staticmethod
+    def _texto_ou_placeholder(valor: str | None, placeholder: str) -> str:
+        if not valor:
+            return placeholder
+        limpo = valor.strip()
+        if not limpo or limpo == "000.000.000-00":
+            return placeholder
+        return limpo
+
     @staticmethod
     def gerar_pdf(orcamento_id: int) -> str:
         pasta_saida = Path("orcamentos_emitidos")
@@ -28,6 +48,16 @@ class PDFService:
             
             motor = session.get(Motor, orcamento.motor_id)
             itens_pecas = session.exec(select(ItemOrcamento).where(ItemOrcamento.orcamento_id == orcamento_id)).all()
+            cliente = PDFService._buscar_cliente_por_nome(session, orcamento.cliente_nome)
+
+            # Extrai dados do cliente enquanto a sessão está aberta
+            cliente_gov_id = cliente.gov_id if cliente else None
+            cliente_endereco = cliente.endereco if cliente else None
+            cliente_numero = cliente.numero if cliente else None
+            cliente_bairro = cliente.bairro if cliente else None
+            cliente_cidade = cliente.cidade if cliente else None
+            cliente_estado = cliente.estado if cliente else None
+            cliente_telefone = cliente.telefone if cliente else None
         
         doc = SimpleDocTemplate(
             str(arquivo_pdf), pagesize=A4,
@@ -37,9 +67,9 @@ class PDFService:
         styles = getSampleStyleSheet()
         
         # AJUSTE FIX: Adicionado 'leading' proporcional ao 'fontSize' para evitar textos sobrepostos
-        estilo_cabecalho_titulo = ParagraphStyle('CabecalhoTitulo', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=18, leading=22, alignment=1, spaceAfter=4)
-        estilo_cabecalho_texto = ParagraphStyle('CabecalhoTexto', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, leading=14, alignment=1, spaceAfter=4)
-        estilo_cabecalho_endereco = ParagraphStyle('CabecalhoEndereco', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14, alignment=1, spaceAfter=15)
+        estilo_cabecalho_titulo = ParagraphStyle('CabecalhoTitulo', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=16, leading=20, alignment=0, spaceAfter=2)
+        estilo_cabecalho_texto = ParagraphStyle('CabecalhoTexto', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, leading=12, alignment=0, spaceAfter=2)
+        estilo_cabecalho_endereco = ParagraphStyle('CabecalhoEndereco', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=12, alignment=0, spaceAfter=0)
         estilo_orcamento = ParagraphStyle('OrcamentoTitulo', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, leading=18, alignment=1, spaceAfter=15)
         
         estilo_texto = ParagraphStyle('TextoDoc', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14)
@@ -47,18 +77,52 @@ class PDFService:
         estilo_tabela_centro = ParagraphStyle('TabCentro', parent=estilo_texto, alignment=1)
         estilo_tabela_dir = ParagraphStyle('TabDir', parent=estilo_texto, alignment=2)
         
-        # --- CABEÇALHO ---
-        story.append(Paragraph(dados_empresa["empresa_nome"], estilo_cabecalho_titulo))
-        story.append(Paragraph(dados_empresa["empresa_linha_1"], estilo_cabecalho_texto))
-        story.append(Paragraph(dados_empresa["empresa_linha_2"], estilo_cabecalho_endereco))
-        
+        # --- CABEÇALHO (logo + dados da empresa) ---
+        bloco_empresa = [
+            Paragraph(dados_empresa["empresa_nome"], estilo_cabecalho_titulo),
+            Paragraph(dados_empresa["empresa_linha_1"], estilo_cabecalho_texto),
+            Paragraph(dados_empresa["empresa_linha_2"], estilo_cabecalho_endereco),
+        ]
+
+        logo_path = get_logo_path()
+        if logo_path:
+            logo = RLImage(str(logo_path), width=78, height=78)
+            cabecalho = Table(
+                [[logo, bloco_empresa]],
+                colWidths=[90, 435],
+            )
+            cabecalho.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 0),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ]))
+            story.append(cabecalho)
+        else:
+            estilo_centro_titulo = ParagraphStyle('CabecalhoTituloC', parent=estilo_cabecalho_titulo, alignment=1)
+            estilo_centro_texto = ParagraphStyle('CabecalhoTextoC', parent=estilo_cabecalho_texto, alignment=1)
+            estilo_centro_end = ParagraphStyle('CabecalhoEnderecoC', parent=estilo_cabecalho_endereco, alignment=1)
+            story.append(Paragraph(dados_empresa["empresa_nome"], estilo_centro_titulo))
+            story.append(Paragraph(dados_empresa["empresa_linha_1"], estilo_centro_texto))
+            story.append(Paragraph(dados_empresa["empresa_linha_2"], estilo_centro_end))
+
+        story.append(Spacer(1, 12))
         story.append(Paragraph("ORÇAMENTO", estilo_orcamento))
         
         # --- DADOS DO CLIENTE ---
+        cnpj_cpf = PDFService._texto_ou_placeholder(cliente_gov_id, "________________")
+        endereco = PDFService._texto_ou_placeholder(cliente_endereco, "__________________________________")
+        numero = PDFService._texto_ou_placeholder(cliente_numero, "____")
+        telefone = PDFService._texto_ou_placeholder(cliente_telefone, "________________")
+        cidade = PDFService._texto_ou_placeholder(cliente_cidade, "________________")
+        bairro = PDFService._texto_ou_placeholder(cliente_bairro, "________________")
+        estado = PDFService._texto_ou_placeholder(cliente_estado, "____")
+
         dados_cliente = [
-            [Paragraph(f"<b>Para:</b> {orcamento.cliente_nome}", estilo_texto), Paragraph("<b>CNPJ:</b> ________________", estilo_texto), ""],
-            [Paragraph("<b>Endereço:</b> __________________________________", estilo_texto), Paragraph("<b>nº:</b> ____", estilo_texto), Paragraph("<b>Tel:</b> ________________", estilo_texto)],
-            [Paragraph("<b>Cidade:</b> Taquaritinga", estilo_texto), Paragraph("<b>Bairro:</b> ", estilo_texto), Paragraph("<b>Estado:</b> São Paulo", estilo_texto)]
+            [Paragraph(f"<b>Para:</b> {orcamento.cliente_nome}", estilo_texto), Paragraph(f"<b>CNPJ/CPF:</b> {cnpj_cpf}", estilo_texto), ""],
+            [Paragraph(f"<b>Endereço:</b> {endereco}", estilo_texto), Paragraph(f"<b>nº:</b> {numero}", estilo_texto), Paragraph(f"<b>Tel:</b> {telefone}", estilo_texto)],
+            [Paragraph(f"<b>Cidade:</b> {cidade}", estilo_texto), Paragraph(f"<b>Bairro:</b> {bairro}", estilo_texto), Paragraph(f"<b>Estado:</b> {estado}", estilo_texto)]
         ]
         tabela_cliente = Table(dados_cliente, colWidths=[240, 140, 145])
         tabela_cliente.setStyle(TableStyle([
@@ -195,31 +259,17 @@ class PDFService:
         import webbrowser
         from src.models.entities import Cliente
 
-        print(f"\n--- INÍCIO DO DEBUG WHATSAPP ---")
-        print(f"Nome do cliente recebido do orçamento: '{nome_cliente}'")
-        print(f"Telefone recebido direto da tela: '{telefone}'")
-
         if not telefone or str(telefone).strip() == "":
-            print(f"Telefone vazio! Iniciando varredura no banco de dados...")
             try:
                 with get_session() as session:
-                    todos_clientes = session.exec(select(Cliente)).all()
-                    print(f"Total de clientes cadastrados no banco: {len(todos_clientes)}")
-                    
                     nome_alvo = nome_cliente.strip().lower() if nome_cliente else ""
-                    
-                    for c in todos_clientes:
+                    for c in session.exec(select(Cliente)).all():
                         nome_db = c.nome.strip().lower() if c.nome else ""
-                        print(f" -> Comparando banco: '{nome_db}' (Tel: {c.telefone}) com alvo: '{nome_alvo}'")
-                        
                         if nome_db == nome_alvo:
                             telefone = c.telefone
-                            print(f" [!] MATCH ENCONTRADO! O telefone agora é: '{telefone}'")
                             break
-            except Exception as db_ex:
-                print(f"ERRO DE BANCO DE DADOS DURANTE A BUSCA: {db_ex}")
-
-        print(f"Telefone final processado antes de gerar o link: '{telefone}'")
+            except Exception:
+                pass
 
         mensagem = f"Olá, {nome_cliente}! Segue o orçamento solicitado."
         mensagem_codificada = urllib.parse.quote(mensagem)
@@ -229,19 +279,13 @@ class PDFService:
         if telefone_limpo:
             if not telefone_limpo.startswith("55") and len(telefone_limpo) >= 10:
                 telefone_limpo = f"55{telefone_limpo}"
-            
-            print(f"URL gerada: https://wa.me/{telefone_limpo}")
             url_whatsapp = f"https://wa.me/{telefone_limpo}?text={mensagem_codificada}"
         else:
-            print("Nenhum telefone encontrado. Abrindo WhatsApp Web Geral...")
             url_whatsapp = f"https://web.whatsapp.com/send?text={mensagem_codificada}"
-            
-        print(f"--- FIM DO DEBUG WHATSAPP ---\n")
         
         webbrowser.open(url_whatsapp)
         
         if sys.platform == "win32":
-            import subprocess
             subprocess.Popen(f'explorer /select,"{Path(caminho_pdf).resolve()}"')
         else:
             os.startfile(Path(caminho_pdf).parent.resolve())

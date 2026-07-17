@@ -1,7 +1,6 @@
 ﻿from sqlmodel import select, func
 from src.core.database import get_session
 from src.models.entities import Orcamento, ItemOrcamento
-#from src.models.entities import Orcamento, StatusOrcamento
 
 class OrcamentoRepository:
     @staticmethod
@@ -38,8 +37,7 @@ class OrcamentoRepository:
                 finalizados = len(session.exec(select(Orcamento).where(Orcamento.status == "Finalizado")).all())
                 
                 return aprovados, pendentes, reprovados, finalizados
-        except Exception as e:
-            print(f"Erro ao contar status: {e}")
+        except Exception:
             return 0, 0, 0, 0
 
     @staticmethod
@@ -60,8 +58,7 @@ class OrcamentoRepository:
                     "faturamento_estimado": faturamento_estimado,
                     "ticket_medio": ticket_medio,
                 }
-        except Exception as e:
-            print(f"Erro ao obter resumo financeiro: {e}")
+        except Exception:
             return {
                 "total_orcamentos": 0,
                 "faturamento_estimado": 0.0,
@@ -74,8 +71,7 @@ class OrcamentoRepository:
             with get_session() as session:
                 statement = select(Orcamento).order_by(Orcamento.id.desc()).limit(limit)
                 return list(session.exec(statement).all())
-        except Exception as e:
-            print(f"Erro ao obter últimos orçamentos: {e}")
+        except Exception:
             return []
 
     @staticmethod
@@ -102,8 +98,7 @@ class OrcamentoRepository:
                         funil[status] += quantidade
 
                 return funil
-        except Exception as e:
-            print(f"Erro ao obter funil por status: {e}")
+        except Exception:
             return {
                 "Pendente": 0,
                 "Aprovado": 0,

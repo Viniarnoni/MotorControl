@@ -6,7 +6,12 @@ class Cliente(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     nome: str
     telefone: Optional[str] = None
-    endereco: Optional[str] = None
+    endereco: Optional[str] = None  # Rua / logradouro
+    numero: Optional[str] = None
+    bairro: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    gov_id: Optional[str] = None  # CNPJ ou CPF (opcional)
     status: Optional[str] = "Ativo"
 
 class Motor(SQLModel, table=True):

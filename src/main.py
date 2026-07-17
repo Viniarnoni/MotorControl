@@ -1,7 +1,9 @@
-import os
 import sys
+from pathlib import Path
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+app_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+if str(app_root) not in sys.path:
+    sys.path.insert(0, str(app_root))
 
 import flet as ft
 from src.core.database import init_db
@@ -15,7 +17,7 @@ from src.ui.views.config_view import ConfigView
 def main(page: ft.Page):
     init_db()
 
-    page.title = 'OficinaMotor — Gestão de Oficina'
+    page.title = 'MotorControl — Gestão de Oficina'
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 0
 

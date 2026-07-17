@@ -1,7 +1,6 @@
 import sqlite3
-from pathlib import Path
 
-from src.core.database import DATABASE_URL
+from src.core.database import DATABASE_PATH
 
 
 class ConfigRepository:
@@ -11,17 +10,9 @@ class ConfigRepository:
         "empresa_linha_2": "Rua: Ennes Reis Rodrigues, 113 - Jardim Bela Vista - CEP: 15905-004 - Taquaritinga-SP",
     }
 
-    @staticmethod
-    def _db_path() -> Path:
-        database_file = DATABASE_URL.replace("sqlite:///", "", 1)
-        path = Path(database_file)
-        if path.is_absolute():
-            return path
-        return Path(__file__).resolve().parents[2] / path
-
     @classmethod
     def _connect(cls) -> sqlite3.Connection:
-        conn = sqlite3.connect(cls._db_path())
+        conn = sqlite3.connect(DATABASE_PATH)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS config (
@@ -31,11 +22,6 @@ class ConfigRepository:
             """
         )
         return conn
-
-    @classmethod
-    def _garantir_tabela(cls):
-        with cls._connect():
-            pass
 
     @classmethod
     def obter_por_chave(cls, chave: str, padrao: str = "") -> str:

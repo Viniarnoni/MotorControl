@@ -52,7 +52,20 @@ class OrcamentoForm(ft.Column):
         self.txt_valor_mao_de_obra.on_change = self.ao_mudar_valor_manual
 
         # --- SEÇÃO: PEÇAS ---
-        self.drop_pecas = ft.Dropdown(label="Peça/Componente", expand=True, border_color=ft.Colors.GREY_700)
+        self.txt_busca_peca = ft.TextField(
+            label="Buscar peça",
+            hint_text="Digite o nome da peça...",
+            expand=True,
+            border_color=ft.Colors.GREY_700,
+            prefix_icon=ft.Icons.SEARCH,
+            on_change=self.ao_digitar_peca,
+        )
+        self.drop_pecas = ft.Dropdown(
+            label="Peça/Componente",
+            expand=True,
+            border_color=ft.Colors.GREY_700,
+            hint_text="Selecione na lista filtrada",
+        )
         
         self.txt_qtd_peca = ft.TextField(
             value="1", width=50, text_align=ft.TextAlign.CENTER, 
@@ -110,7 +123,8 @@ class OrcamentoForm(ft.Column):
             ft.Divider(height=10, color=ft.Colors.GREY_800),
             
             ft.Text("Incluir Peças e Componentes na Troca", size=15, weight=ft.FontWeight.BOLD),
-            ft.Row([self.drop_pecas, self.row_quantidade, self.btn_add_peca], alignment=ft.MainAxisAlignment.START, vertical_alignment="center"),
+            ft.Row([self.txt_busca_peca, self.drop_pecas], spacing=10),
+            ft.Row([self.row_quantidade, self.btn_add_peca], alignment=ft.MainAxisAlignment.START, vertical_alignment="center"),
             ft.Container(content=ft.ListView([self.table_itens_pecas], expand=True), height=180),
             ft.Divider(height=10, color=ft.Colors.GREY_800),
             self.txt_obs,
@@ -144,8 +158,11 @@ class OrcamentoForm(ft.Column):
                 
             self.drop_motores.options.append(ft.dropdown.Option(key=str(m.id), text=texto_display))
         
-        try: self.drop_motores.update()
-        except: pass
+        try:
+            self.drop_motores.update()
+        except Exception:
+            # Controle ainda não montado na página (chamada no __init__)
+            pass
 
     def somar_qtd(self, e):
         try:
@@ -170,10 +187,31 @@ class OrcamentoForm(ft.Column):
             self.motores_disponiveis = session.exec(select(Motor).where(Motor.is_active == True)).all()
         self.pecas_disponiveis = PrecoPecaRepository.get_all()
         self.atualizar_dropdown_motores()
-        
+        self.atualizar_dropdown_pecas()
+
+    def ao_digitar_peca(self, e):
+        self.atualizar_dropdown_pecas(self.txt_busca_peca.value)
+        self.drop_pecas.value = None
+        self.pg.update()
+
+    def atualizar_dropdown_pecas(self, filtro: str = ""):
+        """Filtra peças pelo nome digitado (mesmo padrão da busca de cliente)."""
+        termo = (filtro or "").strip().lower()
+        pecas = sorted(self.pecas_disponiveis, key=lambda p: (p.nome or "").lower())
+        if termo:
+            pecas = [p for p in pecas if termo in (p.nome or "").lower()]
+
         self.drop_pecas.options.clear()
-        for p in self.pecas_disponiveis:
-            self.drop_pecas.options.append(ft.dropdown.Option(key=str(p.id), text=f"{p.nome} (R$ {p.preco_unitario:.2f})"))
+        for p in pecas:
+            self.drop_pecas.options.append(
+                ft.dropdown.Option(key=str(p.id), text=f"{p.nome} (R$ {p.preco_unitario:.2f})")
+            )
+
+        # Se só sobrou uma peça, já seleciona automaticamente
+        if len(pecas) == 1:
+            self.drop_pecas.value = str(pecas[0].id)
+        elif self.drop_pecas.value and not any(str(p.id) == self.drop_pecas.value for p in pecas):
+            self.drop_pecas.value = None
 
     def ao_selecionar_motor(self, e):
         if not self.drop_motores.value: return
@@ -241,7 +279,10 @@ class OrcamentoForm(ft.Column):
             self.itens_temporarios_pecas.append({"nome": peca.nome, "qtd": qtd, "preco_uni": peca.preco_unitario, "total": peca.preco_unitario * qtd})
             self.txt_qtd_peca.value = "1"
             self.drop_pecas.value = None
+            self.txt_busca_peca.value = ""
+            self.atualizar_dropdown_pecas()
             self.txt_qtd_peca.update()
+            self.txt_busca_peca.update()
             self.drop_pecas.update()
             self.atualizar_totais_tela()
 
@@ -314,7 +355,9 @@ class OrcamentoForm(ft.Column):
                 self.btn_cancelar_edicao.visible = True
                 self.atualizar_totais_tela()
         except Exception as ex:
-            print(ex)
+            self.txt_detalhes_motor.value = f"Erro ao carregar orçamento: {ex}"
+            self.txt_detalhes_motor.color = ft.Colors.RED_400
+            self.pg.update()
 
     def cancelar_edicao_ativa(self, e):
         self.editando_orcamento_id = None
@@ -328,6 +371,11 @@ class OrcamentoForm(ft.Column):
         self.txt_busca_cliente.value = ""
         self.txt_busca_cliente.update()
         self.atualizar_dropdown_motores()
+
+        self.txt_busca_peca.value = ""
+        self.pecas_disponiveis = PrecoPecaRepository.get_all()
+        self.atualizar_dropdown_pecas()
+        self.drop_pecas.value = None
         
         self.drop_motores.value = None
         self.txt_detalhes_motor.value = "Digite o nome do cliente ou selecione um motor."

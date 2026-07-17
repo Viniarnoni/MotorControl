@@ -117,7 +117,12 @@ class OrcamentoLista(ft.Column):
                     session.commit()
             self.carregar_historico_db()
         except Exception as ex:
-            print(f"Erro ao mudar status: {ex}")
+            self.pg.snack_bar = ft.SnackBar(
+                ft.Text(f"Erro ao mudar status: {ex}"),
+                bgcolor=ft.Colors.RED_700,
+            )
+            self.pg.snack_bar.open = True
+            self.pg.update()
 
     def excluir_orcamento(self, orcamento_id):
         def fechar_dialogo_exclusao(e):
@@ -137,7 +142,12 @@ class OrcamentoLista(ft.Column):
                     session.commit()
                 self.carregar_historico_db()
             except Exception as ex:
-                print(ex)
+                self.pg.snack_bar = ft.SnackBar(
+                    ft.Text(f"Erro ao excluir orçamento: {ex}"),
+                    bgcolor=ft.Colors.RED_700,
+                )
+                self.pg.snack_bar.open = True
+                self.pg.update()
 
         dialogo_exclusao = ft.AlertDialog(
             title=ft.Text("Confirmar Exclusão", weight=ft.FontWeight.BOLD, color=ft.Colors.RED_400),

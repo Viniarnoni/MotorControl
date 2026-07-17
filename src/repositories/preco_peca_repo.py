@@ -14,7 +14,7 @@ class PrecoPecaRepository:
     @staticmethod
     def get_all():
         with get_session() as session:
-            return session.exec(select(PrecoPeca)).all()
+            return list(session.exec(select(PrecoPeca).order_by(PrecoPeca.nome)).all())
 
     @staticmethod
     def delete(peca_id: int):

@@ -23,6 +23,11 @@ class ClienteRepository:
                 db_cliente.nome = cliente.nome
                 db_cliente.telefone = cliente.telefone
                 db_cliente.endereco = cliente.endereco
+                db_cliente.numero = cliente.numero
+                db_cliente.bairro = cliente.bairro
+                db_cliente.cidade = cliente.cidade
+                db_cliente.estado = cliente.estado
+                db_cliente.gov_id = cliente.gov_id
                 db_cliente.status = cliente.status
                 session.commit()
                 session.refresh(db_cliente)

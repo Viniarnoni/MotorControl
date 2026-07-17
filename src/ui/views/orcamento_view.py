@@ -52,7 +52,12 @@ class OrcamentoView(ft.Container):
             caminho = PDFService.gerar_pdf(orcamento_id)
             PDFService.enviar_whatsapp(caminho, cliente_nome)
         except Exception as ex:
-            print(f"Erro WhatsApp: {ex}")
+            self.pg.snack_bar = ft.SnackBar(
+                ft.Text(f"Erro ao enviar WhatsApp: {ex}"),
+                bgcolor=ft.Colors.RED_700,
+            )
+            self.pg.snack_bar.open = True
+            self.pg.update()
 
     def emitir_pdf_orcamento(self, orcamento_id):
         try:
@@ -60,7 +65,12 @@ class OrcamentoView(ft.Container):
             caminho = PDFService.gerar_pdf(orcamento_id)
             PDFService.abrir_pdf(caminho)
         except Exception as ex:
-            print(f"Erro PDF: {ex}")
+            self.pg.snack_bar = ft.SnackBar(
+                ft.Text(f"Erro ao gerar PDF: {ex}"),
+                bgcolor=ft.Colors.RED_700,
+            )
+            self.pg.snack_bar.open = True
+            self.pg.update()
 
     def exibir_popup_sucesso(self, orcamento_id, nome_cliente):
         def fechar_dialogo_sucesso(ev):

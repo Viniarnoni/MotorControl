@@ -1,6 +1,41 @@
-﻿.venv/
+﻿# Ambiente
+.venv/
+.env
+.env.*
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+dist_pkg/
+
+# IDE
 .vscode/
 .idea/
+
+# Banco e backups
 *.db
+*.bd
+*.sqlite
+*.sqlite3
+backups/
+
+# Empacotamento (PyInstaller / Flet pack)
+build/
+dist/
+*.exe
+*.pkg
+*.pyz
+
+# Spec gerado com paths locais — rebuild via build_exe.ps1
+MotorControl.spec
+SistemaMecanica.spec
+
+# Saídas de runtime
+orcamentos_emitidos/
+assets/fotos/
+
+# Dumps / utilitários locais
+estrutura_projeto.txt
+*.pem

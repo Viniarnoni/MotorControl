@@ -1,7 +1,9 @@
 from sqlmodel import SQLModel, create_engine, Session
 from src.models.entities import Cliente, Motor
+from src.core.paths import get_database_path
 
-DATABASE_URL = "sqlite:///motorcontrol.db"
+DATABASE_PATH = get_database_path()
+DATABASE_URL = f"sqlite:///{DATABASE_PATH.as_posix()}"
 
 # engine com eco desativado para produção, mas configurado para SQLite standalone
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})

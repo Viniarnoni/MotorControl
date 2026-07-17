@@ -1,8 +1,8 @@
 import shutil
 from datetime import datetime
-from pathlib import Path
 
 import flet as ft
+from src.core.paths import get_backups_dir, get_database_path
 from src.repositories.config_repo import ConfigRepository
 
 class ConfigView(ft.Container):
@@ -105,9 +105,8 @@ class ConfigView(ft.Container):
 
     def gerar_backup(self, e):
         try:
-            raiz_projeto = Path(__file__).resolve().parents[3]
-            banco_origem = raiz_projeto / "motorcontrol.db"
-            pasta_backup = raiz_projeto / "backups"
+            banco_origem = get_database_path()
+            pasta_backup = get_backups_dir()
             pasta_backup.mkdir(exist_ok=True)
 
             if not banco_origem.exists():
