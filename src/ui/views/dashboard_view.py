@@ -60,7 +60,7 @@ class DashboardView:
                                     size=15,
                                 ),
                                 ft.Text(
-                                    orcamento.motor_descricao or "Sem descrição do equipamento",
+                                    orcamento.motor_descricao or "Sem descrição do motor",
                                     color=ft.Colors.GREY_400,
                                     size=12,
                                 ),

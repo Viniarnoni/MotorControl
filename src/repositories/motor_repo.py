@@ -33,17 +33,17 @@ class MotorRepository:
 
     @staticmethod
     def buscar_para_rastreabilidade(termo: str = "") -> List[Motor]:
-        """Busca motores por tipo, marca, modelo ou nome do cliente para análise histórica."""
+        """Busca motores por marca, modelo ou nome do cliente para análise histórica."""
         with get_session() as session:
-            statement = select(Motor).order_by(Motor.cliente, Motor.marca, Motor.tipo)
+            statement = select(Motor).order_by(Motor.cliente, Motor.marca, Motor.modelo)
 
             if termo:
                 termo_like = f"%{termo.strip()}%"
                 statement = statement.where(
                     or_(
+                        Motor.modelo.ilike(termo_like),
                         Motor.tipo.ilike(termo_like),
                         Motor.marca.ilike(termo_like),
-                        Motor.modelo.ilike(termo_like),
                         Motor.cliente.ilike(termo_like),
                     )
                 )

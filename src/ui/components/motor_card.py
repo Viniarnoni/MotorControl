@@ -11,7 +11,7 @@ def criar_card_motor(item: Motor, on_delete=None, on_edit=None, on_view_photo=No
                 ft.Row([
                     ft.Icon(ft.Icons.ENGINEERING, color=ft.Colors.BLUE_400, size=30),
                     ft.Column([
-                        ft.Text(f"{item.marca} - {item.tipo}", size=16, weight=ft.FontWeight.BOLD),
+                        ft.Text(f"{item.marca} - {item.modelo or item.tipo}", size=16, weight=ft.FontWeight.BOLD),
                         ft.Text(f"Cliente: {item.cliente}", size=13, color=ft.Colors.GREY_400),
                     ], spacing=2, expand=True),
                     ft.Container(
@@ -36,7 +36,6 @@ def criar_card_motor(item: Motor, on_delete=None, on_edit=None, on_view_photo=No
                     ], expand=True),
                     ft.Column([
                         ft.Text(f"Polos: {item.polos if item.polos else 'N/I'}", color=ft.Colors.GREY_400, size=12),
-                        ft.Text(f"Modelo: {item.modelo if item.modelo else 'N/I'}", color=ft.Colors.GREY_400, size=12),
                     ], expand=True),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 
@@ -76,7 +75,7 @@ def criar_card_motor(item: Motor, on_delete=None, on_edit=None, on_view_photo=No
                         ft.Icons.DELETE, 
                         icon_color=ft.Colors.RED_400, 
                         tooltip="Excluir Motor",
-                        on_click=lambda e: on_delete(item.id) if on_delete else None
+                        on_click=lambda e: on_delete(item) if on_delete else None
                     ),
                 ], alignment=ft.MainAxisAlignment.END, spacing=5)
             ], spacing=10)

@@ -59,7 +59,7 @@ class OrcamentoLista(ft.Column):
                                     ft.Icon(ft.Icons.RECEIPT_LONG, color=ft.Colors.BLUE_400, size=28),
                                     ft.Column([
                                         ft.Text(f"Cliente: {o.cliente_nome}", weight=ft.FontWeight.BOLD, size=15),
-                                        ft.Text(f"Equipamento: {o.motor_descricao}", color=ft.Colors.GREY_400, size=13),
+                                        ft.Text(f"Motor: {o.motor_descricao}", color=ft.Colors.GREY_400, size=13),
                                     ], spacing=2)
                                 ], spacing=10),
                                 ft.Row([

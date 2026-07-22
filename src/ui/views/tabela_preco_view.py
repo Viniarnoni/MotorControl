@@ -25,8 +25,8 @@ class TabelaPrecoView(ft.Container):
         
         # --- CAMPOS SERVIÇO ---
         self.txt_serv_cv = ft.TextField(
-            label="Potência (CV)", hint_text="Ex: 1, 1.5, 1/2", width=120, border_color=ft.Colors.GREY_700,
-            input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9\./\\]*$", replacement_string="")
+            label="Potência (CV)", hint_text="Ex: 1, 1.5, 1,5, 1/2", width=120, border_color=ft.Colors.GREY_700,
+            input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9\./\\,]*$", replacement_string="")
         )
         self.drop_serv_fases = ft.Dropdown(
             label="Rede/Fases", width=180, border_color=ft.Colors.GREY_700, value="Monofásico/Bifásico",
@@ -198,7 +198,8 @@ class TabelaPrecoView(ft.Container):
         
         try:
             val = float(self.txt_serv_preco.value)
-            novo = PrecoServico(cv=self.txt_serv_cv.value, fases=self.drop_serv_fases.value, polos=self.drop_serv_polos.value, preco_rebobinagem=val)
+            cv_normalizado = (self.txt_serv_cv.value or "").strip().replace(",", ".")
+            novo = PrecoServico(cv=cv_normalizado, fases=self.drop_serv_fases.value, polos=self.drop_serv_polos.value, preco_rebobinagem=val)
             PrecoServicoRepository.create(novo)
             
             self.txt_serv_cv.value = ""

@@ -24,7 +24,7 @@ class OrcamentoForm(ft.Column):
             on_change=self.ao_digitar_cliente
         )
 
-        self.drop_motores = ft.Dropdown(label="Selecione o Motor / Equipamento", expand=2, border_color=ft.Colors.BLUE_600)
+        self.drop_motores = ft.Dropdown(label="Selecione o Motor", expand=2, border_color=ft.Colors.BLUE_600)
         self.drop_motores.on_change = self.ao_selecionar_motor
         
         self.txt_detalhes_motor = ft.Text("Digite o nome do cliente ou selecione um motor.", color=ft.Colors.GREY_400, italic=True)
@@ -218,7 +218,7 @@ class OrcamentoForm(ft.Column):
         motor_id = int(self.drop_motores.value)
         motor = next((m for m in self.motores_disponiveis if m.id == motor_id), None)
         if motor:
-            self.txt_detalhes_motor.value = f"Especificações: {motor.tipo} {motor.marca} | {motor.cv} CV | {motor.fases} | {motor.polos}"
+            self.txt_detalhes_motor.value = f"Especificações: {motor.marca} {motor.modelo or motor.tipo or ''} | {motor.cv} CV | {motor.fases} | {motor.polos}"
             self.txt_detalhes_motor.color = ft.Colors.WHITE
             
             if not self.txt_busca_cliente.value:
@@ -252,8 +252,10 @@ class OrcamentoForm(ft.Column):
         self.atualizar_totais_tela()
 
     def buscar_preco_rebobinagem(self, cv, fases, polos):
+        cv_norm = (cv or "").replace(",", ".")
         for s in PrecoServicoRepository.get_all():
-            if s.cv == cv and s.fases == fases and s.polos == polos: return s
+            if (s.cv or "").replace(",", ".") == cv_norm and s.fases == fases and s.polos == polos:
+                return s
         return None
 
     def ao_mudar_valor_manual(self, e):
@@ -331,7 +333,7 @@ class OrcamentoForm(ft.Column):
                     self.atualizar_dropdown_motores(motor.cliente)
                     self.drop_motores.value = str(orcamento.motor_id)
                     
-                    self.txt_detalhes_motor.value = f"Especificações: {motor.tipo} {motor.marca} | {motor.cv} CV | {motor.fases} | {motor.polos}"
+                    self.txt_detalhes_motor.value = f"Especificações: {motor.marca} {motor.modelo or motor.tipo or ''} | {motor.cv} CV | {motor.fases} | {motor.polos}"
                     self.txt_detalhes_motor.color = ft.Colors.WHITE
                 
                 # Resgata os novos valores divididos
@@ -408,7 +410,7 @@ class OrcamentoForm(ft.Column):
                     orcamento_db = session.get(Orcamento, self.editando_orcamento_id)
                     if orcamento_db:
                         orcamento_db.motor_id = motor.id
-                        orcamento_db.motor_descricao = f"{motor.marca} {motor.tipo} ({motor.cv}CV)"
+                        orcamento_db.motor_descricao = f"{motor.marca} {motor.modelo or motor.tipo or ''} ({motor.cv}CV)"
                         orcamento_db.cliente_nome = motor.cliente
                         
                         # Aloca os novos campos correspondentes
@@ -428,7 +430,7 @@ class OrcamentoForm(ft.Column):
                     orcamento_id_vinculo = self.editando_orcamento_id
                 else:
                     novo_orcamento = Orcamento(
-                        motor_id=motor.id, motor_descricao=f"{motor.marca} {motor.tipo} ({motor.cv}CV)",
+                        motor_id=motor.id, motor_descricao=f"{motor.marca} {motor.modelo or motor.tipo or ''} ({motor.cv}CV)",
                         cliente_nome=motor.cliente, 
                         valor_rebobinamento=valor_rebo_final,
                         descricao_mao_de_obra=desc_mo_final,

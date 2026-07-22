@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -34,12 +35,17 @@ class PDFService:
         return limpo
 
     @staticmethod
+    def _nome_arquivo_seguro(nome: str) -> str:
+        """Remove caracteres inválidos para nome de arquivo no Windows."""
+        limpo = re.sub(r'[<>:"/\\|?*]', "", (nome or "").strip())
+        limpo = re.sub(r"\s+", "_", limpo)
+        return limpo or "Cliente"
+
+    @staticmethod
     def gerar_pdf(orcamento_id: int) -> str:
         pasta_saida = Path("orcamentos_emitidos")
         pasta_saida.mkdir(exist_ok=True)
         dados_empresa = ConfigRepository.get_company_data()
-        
-        arquivo_pdf = pasta_saida / f"Orcamento_{orcamento_id}.pdf"
         
         with get_session() as session:
             orcamento = session.get(Orcamento, orcamento_id)
@@ -50,6 +56,7 @@ class PDFService:
             itens_pecas = session.exec(select(ItemOrcamento).where(ItemOrcamento.orcamento_id == orcamento_id)).all()
             cliente = PDFService._buscar_cliente_por_nome(session, orcamento.cliente_nome)
 
+            cliente_nome = orcamento.cliente_nome or "Cliente"
             # Extrai dados do cliente enquanto a sessão está aberta
             cliente_gov_id = cliente.gov_id if cliente else None
             cliente_endereco = cliente.endereco if cliente else None
@@ -58,6 +65,12 @@ class PDFService:
             cliente_cidade = cliente.cidade if cliente else None
             cliente_estado = cliente.estado if cliente else None
             cliente_telefone = cliente.telefone if cliente else None
+
+        data_geracao = datetime.now().strftime("%d-%m-%Y")
+        nome_seguro = PDFService._nome_arquivo_seguro(cliente_nome)
+        arquivo_pdf = pasta_saida / f"Orcamento_{nome_seguro}_{data_geracao}.pdf"
+        if arquivo_pdf.exists():
+            arquivo_pdf = pasta_saida / f"Orcamento_{nome_seguro}_{data_geracao}_{orcamento_id}.pdf"
         
         doc = SimpleDocTemplate(
             str(arquivo_pdf), pagesize=A4,
@@ -66,10 +79,10 @@ class PDFService:
         story = []
         styles = getSampleStyleSheet()
         
-        # AJUSTE FIX: Adicionado 'leading' proporcional ao 'fontSize' para evitar textos sobrepostos
-        estilo_cabecalho_titulo = ParagraphStyle('CabecalhoTitulo', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=16, leading=20, alignment=0, spaceAfter=2)
-        estilo_cabecalho_texto = ParagraphStyle('CabecalhoTexto', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, leading=12, alignment=0, spaceAfter=2)
-        estilo_cabecalho_endereco = ParagraphStyle('CabecalhoEndereco', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=12, alignment=0, spaceAfter=0)
+        # Cabeçalho centralizado
+        estilo_cabecalho_titulo = ParagraphStyle('CabecalhoTitulo', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=16, leading=20, alignment=1, spaceAfter=2)
+        estilo_cabecalho_texto = ParagraphStyle('CabecalhoTexto', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, leading=12, alignment=1, spaceAfter=2)
+        estilo_cabecalho_endereco = ParagraphStyle('CabecalhoEndereco', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=12, alignment=1, spaceAfter=0)
         estilo_orcamento = ParagraphStyle('OrcamentoTitulo', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, leading=18, alignment=1, spaceAfter=15)
         
         estilo_texto = ParagraphStyle('TextoDoc', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14)
@@ -77,35 +90,17 @@ class PDFService:
         estilo_tabela_centro = ParagraphStyle('TabCentro', parent=estilo_texto, alignment=1)
         estilo_tabela_dir = ParagraphStyle('TabDir', parent=estilo_texto, alignment=2)
         
-        # --- CABEÇALHO (logo + dados da empresa) ---
-        bloco_empresa = [
-            Paragraph(dados_empresa["empresa_nome"], estilo_cabecalho_titulo),
-            Paragraph(dados_empresa["empresa_linha_1"], estilo_cabecalho_texto),
-            Paragraph(dados_empresa["empresa_linha_2"], estilo_cabecalho_endereco),
-        ]
-
+        # --- CABEÇALHO (logo + dados da empresa centralizados) ---
         logo_path = get_logo_path()
         if logo_path:
             logo = RLImage(str(logo_path), width=78, height=78)
-            cabecalho = Table(
-                [[logo, bloco_empresa]],
-                colWidths=[90, 435],
-            )
-            cabecalho.setStyle(TableStyle([
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-                ('TOPPADDING', (0, 0), (-1, -1), 0),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-            ]))
-            story.append(cabecalho)
-        else:
-            estilo_centro_titulo = ParagraphStyle('CabecalhoTituloC', parent=estilo_cabecalho_titulo, alignment=1)
-            estilo_centro_texto = ParagraphStyle('CabecalhoTextoC', parent=estilo_cabecalho_texto, alignment=1)
-            estilo_centro_end = ParagraphStyle('CabecalhoEnderecoC', parent=estilo_cabecalho_endereco, alignment=1)
-            story.append(Paragraph(dados_empresa["empresa_nome"], estilo_centro_titulo))
-            story.append(Paragraph(dados_empresa["empresa_linha_1"], estilo_centro_texto))
-            story.append(Paragraph(dados_empresa["empresa_linha_2"], estilo_centro_end))
+            logo.hAlign = "CENTER"
+            story.append(logo)
+            story.append(Spacer(1, 6))
+
+        story.append(Paragraph(dados_empresa["empresa_nome"], estilo_cabecalho_titulo))
+        story.append(Paragraph(dados_empresa["empresa_linha_1"], estilo_cabecalho_texto))
+        story.append(Paragraph(dados_empresa["empresa_linha_2"], estilo_cabecalho_endereco))
 
         story.append(Spacer(1, 12))
         story.append(Paragraph("ORÇAMENTO", estilo_orcamento))
@@ -120,7 +115,7 @@ class PDFService:
         estado = PDFService._texto_ou_placeholder(cliente_estado, "____")
 
         dados_cliente = [
-            [Paragraph(f"<b>Para:</b> {orcamento.cliente_nome}", estilo_texto), Paragraph(f"<b>CNPJ/CPF:</b> {cnpj_cpf}", estilo_texto), ""],
+            [Paragraph(f"<b>Para:</b> {cliente_nome}", estilo_texto), Paragraph(f"<b>CNPJ/CPF:</b> {cnpj_cpf}", estilo_texto), ""],
             [Paragraph(f"<b>Endereço:</b> {endereco}", estilo_texto), Paragraph(f"<b>nº:</b> {numero}", estilo_texto), Paragraph(f"<b>Tel:</b> {telefone}", estilo_texto)],
             [Paragraph(f"<b>Cidade:</b> {cidade}", estilo_texto), Paragraph(f"<b>Bairro:</b> {bairro}", estilo_texto), Paragraph(f"<b>Estado:</b> {estado}", estilo_texto)]
         ]
@@ -153,7 +148,8 @@ class PDFService:
                 # Modificação: Tudo em uma linha e exibindo RPM no lugar de Polos
                 fases_str = f" {motor.fases}" if motor.fases else ""
                 marca_str = f" marca: {motor.marca}" if motor.marca else ""
-                mod_str = f" mod: {motor.tipo}" if motor.tipo else ""
+                modelo_pdf = motor.modelo or motor.tipo
+                mod_str = f" mod: {modelo_pdf}" if modelo_pdf else ""
                 cv_str = f" CV: {motor.cv}" if motor.cv else ""
                 rpm_str = f" RPM: {motor.rpm}" if motor.rpm else ""
                 

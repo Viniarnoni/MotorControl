@@ -12,13 +12,13 @@ class MotorView:
         self.form_modal = MotorFormModal(page, on_success=self.atualizar_lista_tela)
         
         self.txt_busca = ft.TextField(
-            hint_text="Buscar por equipamento, marca, modelo ou cliente...",
+            hint_text="Buscar por marca, modelo ou cliente...",
             prefix_icon=ft.Icons.SEARCH, border_color=ft.Colors.BLUE_700, expand=True,
             on_change=lambda e: self.atualizar_lista_tela()
         )
 
         self.txt_busca_historico = ft.TextField(
-            hint_text="Pesquisar por Equipamento/Tipo, Marca, Modelo ou Cliente...",
+            hint_text="Pesquisar por Marca, Modelo ou Cliente...",
             prefix_icon=ft.Icons.SEARCH,
             border_color=ft.Colors.BLUE_700,
             expand=True,
@@ -34,7 +34,7 @@ class MotorView:
         self.motor_para_excluir = None
         self.modal_exclusao = ft.AlertDialog(
             title=ft.Text('Confirmar Exclusão'),
-            content=ft.Text('Tem a certeza de que deseja remover este equipamento?'),
+            content=ft.Text('Tem certeza de que deseja remover este motor?'),
             actions=[
                 ft.TextButton('Cancelar', on_click=self.fechar_modal_exclusao),
                 ft.Button('Excluir', bgcolor=ft.Colors.RED_700, color=ft.Colors.WHITE, on_click=self.confirmar_exclusao)
@@ -50,7 +50,7 @@ class MotorView:
         )
 
         self.btn_aba_cadastro = ft.Button(
-            "Equipamentos Cadastrados",
+            "Motores Cadastrados",
             icon=ft.Icons.LIST_ALT,
             bgcolor=ft.Colors.BLUE_700,
             color=ft.Colors.WHITE,
@@ -84,10 +84,16 @@ class MotorView:
 
     def confirmar_exclusao(self, e):
         if self.motor_para_excluir:
-            MotorRepository.desativar(self.motor_para_excluir)
+            motor_id = (
+                self.motor_para_excluir.id
+                if hasattr(self.motor_para_excluir, "id")
+                else self.motor_para_excluir
+            )
+            MotorRepository.desativar(motor_id)
+            self.motor_para_excluir = None
             self.fechar_modal_exclusao()
             self.atualizar_lista_tela()
-            self.page.snack_bar = ft.SnackBar(ft.Text('Equipamento arquivado!'), bgcolor=ft.Colors.RED_700)
+            self.page.snack_bar = ft.SnackBar(ft.Text('Motor arquivado!'), bgcolor=ft.Colors.RED_700)
             self.page.snack_bar.open = True
             self.page.update()
 
@@ -110,9 +116,9 @@ class MotorView:
         if termo:
             lista = [
                 i for i in lista if
-                termo in (i.tipo or "").lower() or
                 termo in (i.marca or "").lower() or
                 termo in (i.modelo or "").lower() or
+                termo in (i.tipo or "").lower() or
                 termo in (i.cliente or "").lower()
             ]
             
@@ -150,7 +156,7 @@ class MotorView:
                                     ft.Column(
                                         [
                                             ft.Text(
-                                                f"{motor.marca} - {motor.tipo}",
+                                                f"{motor.marca} - {motor.modelo or motor.tipo}",
                                                 weight=ft.FontWeight.BOLD,
                                                 size=15,
                                             ),
@@ -160,7 +166,7 @@ class MotorView:
                                                 size=12,
                                             ),
                                             ft.Text(
-                                                f"Modelo: {motor.modelo or 'N/I'}",
+                                                f"Potência: {motor.cv or 'N/I'} CV",
                                                 color=ft.Colors.GREY_500,
                                                 size=12,
                                             ),
@@ -184,7 +190,7 @@ class MotorView:
         else:
             self.lista_motores_rastreabilidade.controls.append(
                 ft.Text(
-                    "Nenhum equipamento encontrado para a rastreabilidade.",
+                    "Nenhum motor encontrado para a rastreabilidade.",
                     color=ft.Colors.GREY_400,
                     italic=True,
                 )
@@ -215,7 +221,7 @@ class MotorView:
                 content=ft.Column(
                     [
                         ft.Text(
-                            f"Histórico do Equipamento: {motor.marca} - {motor.tipo}",
+                            f"Histórico do Motor: {motor.marca} - {motor.modelo or motor.tipo}",
                             size=18,
                             weight=ft.FontWeight.BOLD,
                         ),
@@ -285,7 +291,7 @@ class MotorView:
         else:
             self.coluna_historico_motor.controls.append(
                 ft.Text(
-                    "Nenhum orçamento anterior encontrado para este equipamento.",
+                    "Nenhum orçamento anterior encontrado para este motor.",
                     color=ft.Colors.GREY_400,
                     italic=True,
                 )
@@ -296,7 +302,7 @@ class MotorView:
     def _build_cadastro_content(self):
         return ft.Column([
             ft.Row([
-                ft.Text('Motores e Equipamentos', size=28, weight=ft.FontWeight.BOLD),
+                ft.Text('Motores', size=28, weight=ft.FontWeight.BOLD),
                 ft.Button('Novo motor', icon=ft.Icons.ADD, bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.abrir_novo_motor)
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
@@ -310,13 +316,13 @@ class MotorView:
             [
                 ft.Text('Rastreabilidade / Histórico por Motor', size=28, weight=ft.FontWeight.BOLD),
                 ft.Text(
-                    'Pesquise pelo equipamento, marca, modelo ou cliente e selecione o motor para ver todas as manutenções vinculadas.',
+                    'Pesquise pela marca, modelo ou cliente e selecione o motor para ver todas as manutenções vinculadas.',
                     color=ft.Colors.GREY_400,
                 ),
                 ft.Divider(height=15, color=ft.Colors.GREY_800),
                 self.txt_busca_historico,
                 ft.Container(height=10),
-                ft.Text('Equipamentos encontrados', size=18, weight=ft.FontWeight.BOLD),
+                ft.Text('Motores encontrados', size=18, weight=ft.FontWeight.BOLD),
                 self.lista_motores_rastreabilidade,
                 ft.Container(height=20),
                 ft.Text('Linha do Tempo / Histórico', size=18, weight=ft.FontWeight.BOLD),

@@ -16,15 +16,20 @@ class MotorFormModal:
         self.motor_em_edicao = None
         self.caminho_foto_atual = None
         
-        self.txt_tipo = ft.TextField(label='Equipamento/Tipo', hint_text='Ex: Bomba, Betoneira', border_color=ft.Colors.GREY_700, expand=True)
-        self.txt_marca = ft.TextField(label='Marca', hint_text='Ex: WEG, Dancor', border_color=ft.Colors.GREY_700, expand=True)
-        self.txt_modelo = ft.TextField(label='Modelo', border_color=ft.Colors.GREY_700, expand=True)
+        self.txt_marca = ft.TextField(label='Marca *', hint_text='Ex: WEG, Dancor', border_color=ft.Colors.GREY_700, expand=True)
+        self.txt_modelo = ft.TextField(
+            label='Modelo *',
+            hint_text='Ex: W22, IP55',
+            border_color=ft.Colors.GREY_700,
+            expand=True,
+        )
         
         self.txt_cv = ft.TextField(
-            label='Potência (CV)', hint_text='Ex: 1/2, 1.5, 2', 
-            border_color=ft.Colors.GREY_700, 
-            input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9\/\.]*$", replacement_string=""), 
-            expand=True
+            label='Potência (CV)',
+            hint_text='Ex: 1/2, 1.5, 1,5, 2',
+            border_color=ft.Colors.GREY_700,
+            input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9\/\.,]*$", replacement_string=""),
+            expand=True,
         )
         
         self.txt_rpm = ft.TextField(label='Rotação (RPM)', hint_text='Ex: 3500, 1750', border_color=ft.Colors.GREY_700, max_length=4, input_filter=ft.NumbersOnlyInputFilter(), expand=True)
@@ -32,10 +37,14 @@ class MotorFormModal:
         self.dropdown_tensao = ft.Dropdown(
             label='Tensão/Voltagem',
             border_color=ft.Colors.GREY_700, expand=True,
-            options=[ft.dropdown.Option('110'), ft.dropdown.Option('220'), ft.dropdown.Option('110/220'), ft.dropdown.Option('380'), ft.dropdown.Option('440')]
+            options=[
+                ft.dropdown.Option('110'),
+                ft.dropdown.Option('220'),
+                ft.dropdown.Option('110/220'),
+                ft.dropdown.Option('220/380'),
+            ],
         )
         
-        # --- NOVOS CAMPOS PARA A MATRIZ DE PREÇO ---
         self.dropdown_fases = ft.Dropdown(
             label='Fases / Rede *',
             border_color=ft.Colors.GREY_700, expand=True,
@@ -49,7 +58,6 @@ class MotorFormModal:
             value="2 Polos",
             options=[ft.dropdown.Option('2 Polos'), ft.dropdown.Option('4 Polos'), ft.dropdown.Option('6 Polos'), ft.dropdown.Option('8 Polos')]
         )
-        # ------------------------------------------
         
         self.txt_problema = ft.TextField(label='Problema relatado', multiline=True, min_lines=2, border_color=ft.Colors.GREY_700)
         
@@ -65,18 +73,17 @@ class MotorFormModal:
         self.img_preview = ft.Image(src="", width=120, height=120, fit="contain", visible=False, border_radius=8)
         
         self.dropdown_cliente = ft.Dropdown(label='Selecione o Cliente *', border_color=ft.Colors.BLUE_700, options=[])
-        self.btn_salvar_modal = ft.Button('Salvar no Banco', bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE, on_click=self.salvar_motor)
         
         self.modal = ft.AlertDialog(
-            title=ft.Text('Novo motor / Equipamento', weight=ft.FontWeight.BOLD),
+            title=ft.Text('Novo motor', weight=ft.FontWeight.BOLD),
             content=ft.Container(
-                width=600, height=640,
+                width=600, height=620,
                 content=ft.ListView([
                     self.dropdown_cliente,
-                    ft.Row([self.txt_tipo, self.txt_marca], spacing=10),
-                    ft.Row([self.txt_modelo, self.txt_cv], spacing=10),
-                    ft.Row([self.txt_rpm, self.dropdown_tensao], spacing=10),
-                    ft.Row([self.dropdown_fases, self.dropdown_polos], spacing=10), # Nova linha adicionada
+                    ft.Row([self.txt_marca, self.txt_modelo], spacing=10),
+                    ft.Row([self.txt_cv, self.txt_rpm], spacing=10),
+                    ft.Row([self.dropdown_tensao, self.dropdown_fases], spacing=10),
+                    self.dropdown_polos,
                     ft.Row([self.txt_data_entrada, self.btn_calendario], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                     self.txt_problema,
                     ft.Divider(color=ft.Colors.GREY_800),
@@ -137,7 +144,7 @@ class MotorFormModal:
         self.page.update()
 
     def limpar_campos(self):
-        for txt in [self.txt_tipo, self.txt_marca, self.txt_modelo, self.txt_cv, self.txt_rpm, self.txt_problema]:
+        for txt in [self.txt_marca, self.txt_modelo, self.txt_cv, self.txt_rpm, self.txt_problema]:
             txt.value = ''
         self.dropdown_tensao.value = None
         self.dropdown_fases.value = "Monofásico/Bifásico"
@@ -152,12 +159,12 @@ class MotorFormModal:
 
     def abrir_para_novo(self):
         self.motor_em_edicao = None
-        self.modal.title.value = 'Novo motor / Equipamento'
+        self.modal.title.value = 'Novo motor'
         self.btn_salvar_modal.text = 'Salvar no Banco'
         self.btn_salvar_modal.bgcolor = ft.Colors.BLUE_700
         self.dropdown_cliente.disabled = False
-        self.txt_tipo.disabled = False
         self.txt_marca.disabled = False
+        self.txt_modelo.disabled = False
         self.limpar_campos()
         self.carregar_clientes_no_dropdown()
         
@@ -168,17 +175,17 @@ class MotorFormModal:
 
     def abrir_para_editar(self, motor):
         self.motor_em_edicao = motor
-        self.modal.title.value = 'Editar Motor / Equipamento'
+        self.modal.title.value = 'Editar motor'
         self.btn_salvar_modal.text = 'Salvar Alterações'
         self.btn_salvar_modal.bgcolor = ft.Colors.ORANGE_700
         self.dropdown_cliente.disabled = True
-        self.txt_tipo.disabled = True
         self.txt_marca.disabled = True
+        self.txt_modelo.disabled = False
         self.carregar_clientes_no_dropdown()
         
-        self.txt_tipo.value = motor.tipo
         self.txt_marca.value = motor.marca
-        self.txt_modelo.value = motor.modelo
+        # Modelo no lugar do antigo Equipamento/Tipo (fallback para registros antigos)
+        self.txt_modelo.value = motor.modelo or motor.tipo or ''
         self.txt_cv.value = str(motor.cv or '')
         self.txt_rpm.value = re.sub(r"[^0-9]", "", str(motor.rpm or ''))
         
@@ -186,7 +193,6 @@ class MotorFormModal:
         opcoes_tensao = [opt.key for opt in self.dropdown_tensao.options]
         self.dropdown_tensao.value = tensao_suja if tensao_suja in opcoes_tensao else None
         
-        # Restaura os novos campos técnicos na edição
         self.dropdown_fases.value = motor.fases if motor.fases else "Monofásico/Bifásico"
         self.dropdown_polos.value = motor.polos if motor.polos else "2 Polos"
         
@@ -220,14 +226,23 @@ class MotorFormModal:
         self.modal.open = True
         self.page.update()
 
+    @staticmethod
+    def _normalizar_cv(valor: str | None) -> str | None:
+        if not valor:
+            return None
+        limpo = valor.strip().replace(",", ".")
+        return limpo or None
+
     def salvar_motor(self, e):
-        if not self.txt_tipo.value or not self.txt_marca.value or not self.dropdown_cliente.value:
-            self.page.snack_bar = ft.SnackBar(ft.Text('Por favor, preencha Cliente, Tipo e Marca!'), bgcolor=ft.Colors.ORANGE_800)
+        if not self.txt_modelo.value or not self.txt_marca.value or not self.dropdown_cliente.value:
+            self.page.snack_bar = ft.SnackBar(ft.Text('Por favor, preencha Cliente, Marca e Modelo!'), bgcolor=ft.Colors.ORANGE_800)
             self.page.snack_bar.open = True
             self.page.update()
             return
             
         tensao_final = str(self.dropdown_tensao.value or '')
+        modelo_final = self.txt_modelo.value.strip()
+        cv_final = self._normalizar_cv(self.txt_cv.value)
         try:
             data_objeto = datetime.strptime(self.txt_data_entrada.value, "%d/%m/%Y").date()
         except ValueError:
@@ -239,10 +254,11 @@ class MotorFormModal:
         cliente_selecionado = self.dropdown_cliente.value
 
         if self.motor_em_edicao:
-            self.motor_em_edicao.tipo = self.txt_tipo.value
+            # Mantém tipo sincronizado com modelo (coluna ainda usada no banco)
+            self.motor_em_edicao.tipo = modelo_final
             self.motor_em_edicao.marca = self.txt_marca.value
-            self.motor_em_edicao.modelo = self.txt_modelo.value
-            self.motor_em_edicao.cv = self.txt_cv.value
+            self.motor_em_edicao.modelo = modelo_final
+            self.motor_em_edicao.cv = cv_final
             self.motor_em_edicao.rpm = self.txt_rpm.value
             self.motor_em_edicao.tensao = tensao_final
             self.motor_em_edicao.fases = self.dropdown_fases.value
@@ -258,11 +274,17 @@ class MotorFormModal:
             msg_sucesso, cor_snack = 'Alterações salvas com sucesso!', ft.Colors.ORANGE_800
         else:
             kwargs = {
-                "tipo": self.txt_tipo.value, "marca": self.txt_marca.value, "modelo": self.txt_modelo.value, 
-                "cv": self.txt_cv.value, "rpm": self.txt_rpm.value, "tensao": tensao_final, 
-                "fases": self.dropdown_fases.value, "polos": self.dropdown_polos.value,
+                "tipo": modelo_final,
+                "marca": self.txt_marca.value,
+                "modelo": modelo_final,
+                "cv": cv_final,
+                "rpm": self.txt_rpm.value,
+                "tensao": tensao_final,
+                "fases": self.dropdown_fases.value,
+                "polos": self.dropdown_polos.value,
                 "problema_relatado": self.txt_problema.value,
-                "caminho_foto": self.caminho_foto_atual, "data_entrada": data_objeto
+                "caminho_foto": self.caminho_foto_atual,
+                "data_entrada": data_objeto,
             }
             if cliente_selecionado:
                 kwargs["cliente"] = cliente_selecionado
